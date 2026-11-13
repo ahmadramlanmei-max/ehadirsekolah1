@@ -679,6 +679,253 @@
         }
     </style>
 
+
+    <!-- TEMA VISUAL APLIKASI: penyegaran warna dan komponen; tidak mengubah struktur maupun JavaScript. -->
+    <style id="ehadir-app-modern-theme">
+      :root {
+        --eh-primary: #2563eb;
+        --eh-primary-dark: #1d4ed8;
+        --eh-accent: #0891b2;
+        --eh-ink: #172b4d;
+        --eh-muted: #64748b;
+        --eh-line: #e2e8f0;
+        --eh-surface: #ffffff;
+        --eh-page: #f3f6fb;
+      }
+
+      body.is-logged-in {
+        background: var(--eh-page) !important;
+        color: var(--eh-ink) !important;
+      }
+
+      body.is-logged-in #app-sidebar {
+        background: linear-gradient(180deg, #101d35 0%, #142743 55%, #102039 100%) !important;
+        color: #eaf1fb !important;
+        border-right: 1px solid rgba(148,163,184,.16) !important;
+        box-shadow: 10px 0 32px rgba(15,23,42,.10) !important;
+      }
+      body.is-logged-in #app-sidebar > div:first-child {
+        background: linear-gradient(135deg, #0b1730, #142b4c) !important;
+        border-bottom: 1px solid rgba(148,163,184,.18) !important;
+      }
+      body.is-logged-in #app-sidebar > div:first-child h2 i {
+        color: #60a5fa !important;
+      }
+      body.is-logged-in #app-sidebar > div:first-child #sidebar-role {
+        color: #bfdbfe !important;
+        background: rgba(59,130,246,.16) !important;
+        border: 1px solid rgba(96,165,250,.18) !important;
+        border-radius: 999px !important;
+      }
+      body.is-logged-in #app-sidebar > nav {
+        padding: 18px 13px 22px !important;
+      }
+      body.is-logged-in #app-sidebar > nav .nav-btn {
+        min-height: 46px !important;
+        margin: 3px 0 !important;
+        padding: 11px 14px !important;
+        border: 1px solid transparent !important;
+        border-radius: 13px !important;
+        color: #cbd5e1 !important;
+        background: transparent !important;
+        transition: background .18s ease, color .18s ease, border-color .18s ease, transform .18s ease !important;
+      }
+      body.is-logged-in #app-sidebar > nav .nav-btn i {
+        color: #94a3b8 !important;
+        transition: color .18s ease !important;
+      }
+      body.is-logged-in #app-sidebar > nav .nav-btn:hover,
+      body.is-logged-in #app-sidebar > nav .nav-btn:focus-visible {
+        color: #fff !important;
+        background: rgba(148,163,184,.13) !important;
+        border-color: rgba(148,163,184,.12) !important;
+        outline: none !important;
+        transform: translateX(2px);
+      }
+      body.is-logged-in #app-sidebar > nav .nav-btn:hover i,
+      body.is-logged-in #app-sidebar > nav .nav-btn:focus-visible i {
+        color: #93c5fd !important;
+      }
+      body.is-logged-in #app-sidebar > nav .nav-btn.bg-slate-800,
+      body.is-logged-in #app-sidebar > nav .nav-btn.bg-slate-800.text-white {
+        color: #fff !important;
+        background: linear-gradient(105deg, #2563eb, #2879d8) !important;
+        border-color: rgba(147,197,253,.25) !important;
+        box-shadow: 0 7px 18px rgba(37,99,235,.22) !important;
+      }
+      body.is-logged-in #app-sidebar > nav .nav-btn.bg-slate-800 i {
+        color: #fff !important;
+      }
+      body.is-logged-in #app-sidebar > div:last-child {
+        background: rgba(5,15,32,.52) !important;
+        border-top: 1px solid rgba(148,163,184,.16) !important;
+      }
+      body.is-logged-in #app-sidebar > div:last-child button {
+        border: 1px solid rgba(248,113,113,.12) !important;
+        border-radius: 13px !important;
+        background: rgba(220,38,38,.12) !important;
+        color: #fca5a5 !important;
+      }
+      body.is-logged-in #app-sidebar > div:last-child button:hover {
+        background: #dc2626 !important;
+        color: #fff !important;
+      }
+
+      body.is-logged-in #app-main {
+        background: var(--eh-page) !important;
+      }
+      body.is-logged-in #app-main > header {
+        min-height: 72px !important;
+        background: rgba(255,255,255,.96) !important;
+        border-bottom: 1px solid #e5ebf4 !important;
+        box-shadow: 0 4px 18px rgba(15,23,42,.045) !important;
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+      }
+      body.is-logged-in #header-school-name {
+        color: #1e3354 !important;
+        letter-spacing: -.025em !important;
+      }
+      body.is-logged-in #clock-date {
+        color: #718096 !important;
+      }
+      body.is-logged-in #clock-time {
+        color: #2563eb !important;
+      }
+      body.is-logged-in #sound-btn {
+        background: #eff6ff !important;
+        color: #2563eb !important;
+        border: 1px solid #dbeafe !important;
+      }
+      body.is-logged-in #sound-btn:hover {
+        background: #dbeafe !important;
+      }
+      body.is-logged-in #content-area {
+        background:
+          radial-gradient(circle at 95% 0%, rgba(59,130,246,.045), transparent 25%),
+          var(--eh-page) !important;
+        scroll-behavior: smooth;
+      }
+
+      body.is-logged-in .view-section h2,
+      body.is-logged-in .view-section h3,
+      body.is-logged-in .view-section h4 {
+        color: #1e3354;
+        letter-spacing: -.018em;
+      }
+      body.is-logged-in .view-section p.text-slate-500,
+      body.is-logged-in .view-section p.text-slate-400 {
+        color: #718096;
+      }
+
+      /* Kartu konten: permukaan lebih bersih, garis halus, dan bayangan lembut. */
+      body.is-logged-in #content-area .bg-white.rounded-2xl,
+      body.is-logged-in #content-area .bg-white.rounded-3xl,
+      body.is-logged-in #content-area .bg-white.rounded-xl {
+        border-color: #e5ebf4 !important;
+        box-shadow: 0 5px 18px rgba(15,35,65,.045) !important;
+      }
+      body.is-logged-in #content-area .bg-white.rounded-2xl,
+      body.is-logged-in #content-area .bg-white.rounded-3xl {
+        transition: box-shadow .2s ease, border-color .2s ease;
+      }
+      body.is-logged-in #content-area .bg-white.rounded-2xl:hover,
+      body.is-logged-in #content-area .bg-white.rounded-3xl:hover {
+        border-color: #d7e4f5 !important;
+        box-shadow: 0 9px 25px rgba(15,35,65,.065) !important;
+      }
+
+      /* Tombol utama dan tombol aksi memakai palet biru yang konsisten. */
+      body.is-logged-in #content-area button.bg-blue-600,
+      body.is-logged-in #content-area button.bg-blue-700 {
+        background: linear-gradient(105deg, #2563eb, #2879d8) !important;
+        box-shadow: 0 5px 13px rgba(37,99,235,.15);
+      }
+      body.is-logged-in #content-area button.bg-blue-600:hover,
+      body.is-logged-in #content-area button.bg-blue-700:hover {
+        background: linear-gradient(105deg, #1d4ed8, #1d6bc4) !important;
+        box-shadow: 0 7px 17px rgba(37,99,235,.22);
+      }
+      body.is-logged-in #content-area button,
+      body.is-logged-in #app-sidebar button {
+        transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+      }
+      body.is-logged-in #content-area button:focus-visible,
+      body.is-logged-in #content-area a:focus-visible,
+      body.is-logged-in #app-sidebar button:focus-visible,
+      body.is-logged-in #app-sidebar a:focus-visible {
+        outline: 3px solid rgba(59,130,246,.28) !important;
+        outline-offset: 2px !important;
+      }
+
+      /* Form, pilihan, dan tabel lebih mudah dibaca. */
+      body.is-logged-in #content-area input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+      body.is-logged-in #content-area select,
+      body.is-logged-in #content-area textarea {
+        border-color: #dbe4f0 !important;
+        border-radius: 11px !important;
+        color: #263b59 !important;
+        background-color: #fbfdff;
+        transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+      }
+      body.is-logged-in #content-area input:focus,
+      body.is-logged-in #content-area select:focus,
+      body.is-logged-in #content-area textarea:focus {
+        border-color: #60a5fa !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,.12) !important;
+        outline: none !important;
+        background: #fff !important;
+      }
+      body.is-logged-in #content-area table thead th {
+        color: #526783;
+        background: #f2f6fc;
+      }
+      body.is-logged-in #content-area table tbody tr:hover {
+        background-color: #f7faff;
+      }
+
+      /* Panel kamera tetap gelap agar area pemindaian memiliki kontras yang tepat. */
+      body.is-logged-in #reader,
+      body.is-logged-in #reader video,
+      body.is-logged-in #face-video {
+        background-color: #081426 !important;
+      }
+
+      @media (max-width: 767px) {
+        body.is-logged-in #app-main > header {
+          min-height: 64px !important;
+          height: 64px !important;
+          padding-left: 13px !important;
+          padding-right: 13px !important;
+        }
+        body.is-logged-in #content-area {
+          padding: 14px !important;
+        }
+        body.is-logged-in #app-sidebar.show-mobile {
+          border-radius: 0 18px 18px 0 !important;
+        }
+        body.is-logged-in #content-area .view-section {
+          min-width: 0 !important;
+        }
+        body.is-logged-in #content-area .overflow-x-auto {
+          max-width: 100% !important;
+          -webkit-overflow-scrolling: touch;
+        }
+        body.is-logged-in #content-area button {
+          min-height: 40px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        body.is-logged-in #app-sidebar *,
+        body.is-logged-in #app-main *,
+        body.is-logged-in #content-area * {
+          scroll-behavior: auto !important;
+          transition-duration: .01ms !important;
+          animation-duration: .01ms !important;
+        }
+      }
+    </style>
+
 </head>
 <body class="text-slate-800 h-screen flex flex-col md:flex-row overflow-hidden">
 
