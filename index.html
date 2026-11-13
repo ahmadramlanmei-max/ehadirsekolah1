@@ -3884,8 +3884,8 @@ document.addEventListener('DOMContentLoaded', function () {
             // Salin kartu dan ubah QR canvas menjadi gambar PNG agar QR tidak hilang pada hasil cetak.
             const cards = Array.from(sourceArea.querySelectorAll('.print-card')).map(card => {
                 const cardCopy = card.cloneNode(true);
-                const sourceQr = card.querySelector('[id^="qr-"]');
-                const targetQr = cardCopy.querySelector('[id^="qr-"]');
+                const sourceQr = card.querySelector('.qr-code-container');
+                const targetQr = cardCopy.querySelector('.qr-code-container');
                 if (sourceQr && targetQr) {
                     let qrSrc = '';
                     const sourceCanvas = sourceQr.querySelector('canvas');
@@ -3933,8 +3933,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 .print-card > div:nth-child(2) { min-width: 0 !important; flex: 1 1 0 !important; padding: 2.5mm !important; overflow: hidden !important; }
                 .print-card h4 { font-size: 8pt !important; line-height: 1.15 !important; white-space: normal !important; overflow: hidden !important; }
                 .print-card p { font-size: 6.5pt !important; line-height: 1.2 !important; }
-                .print-card [id^="qr-"] { width: 16mm !important; height: 16mm !important; max-width: 16mm !important; max-height: 16mm !important; overflow: hidden !important; flex: 0 0 16mm !important; }
-                .print-card img { display: block !important; width: 16mm !important; height: 16mm !important; max-width: 16mm !important; max-height: 16mm !important; object-fit: contain !important; }
+                .print-card .qr-code-container { width: 16mm !important; height: 16mm !important; max-width: 16mm !important; max-height: 16mm !important; overflow: hidden !important; flex: 0 0 16mm !important; }
+                .print-card .qr-code-container img, .print-card .qr-code-container canvas { display: block !important; width: 16mm !important; height: 16mm !important; max-width: 16mm !important; max-height: 16mm !important; object-fit: contain !important; }
                 .print-card canvas { width: 16mm !important; height: 16mm !important; max-width: 16mm !important; max-height: 16mm !important; }
                 .print-card svg { max-width: 16mm !important; max-height: 16mm !important; }
                 @media print { html, body { width: 100% !important; max-width: 100% !important; } #print-root { width: 100% !important; max-width: 194mm !important; } .print-card, .print-card * { break-inside: avoid !important; page-break-inside: avoid !important; } }
@@ -4258,67 +4258,126 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function renderCards() {
-            if(allStudentsCache.length === 0) { 
-                showToast("Muat data siswa terlebih dahulu di menu 'Data Siswa'", "error"); 
-                return; 
+            if (allStudentsCache.length === 0) {
+                showToast("Muat data siswa terlebih dahulu di menu 'Data Siswa'", "error");
+                return;
             }
+
+            // Ambil identitas sekolah dari Pengaturan agar kartu selalu mengikuti profil sekolah.
+            // Jika pengambilan pengaturan gagal, kartu tetap dapat dibuat dengan nama pada header.
+            const renderWithIdentity = function(settings) {
+                renderCardsWithIdentity_(settings || {});
+            };
+
+            try {
+                if (typeof google !== 'undefined' && google.script && google.script.run && currentUser && currentUser.sessionToken) {
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            renderWithIdentity(res && res.status === 'success' ? (res.data || {}) : {});
+                        })
+                        .withFailureHandler(function() {
+                            renderWithIdentity({});
+                        })
+                        .apiGetSettings(currentUser.sessionToken);
+                } else {
+                    renderWithIdentity({});
+                }
+            } catch (err) {
+                console.warn('Pengaturan identitas sekolah tidak dapat dimuat:', err);
+                renderWithIdentity({});
+            }
+        }
+
+        function renderCardsWithIdentity_(schoolSettings) {
             const area = document.getElementById('print-area');
-            area.innerHTML = ''; 
+            if (!area) return;
+            area.innerHTML = '';
             let qrGagal = 0;
-            
+
+            const schoolName = String(
+                schoolSettings['Nama Sekolah'] ||
+                (document.getElementById('header-school-name') && document.getElementById('header-school-name').textContent) ||
+                'IDENTITAS SEKOLAH'
+            ).trim();
+            const schoolLogo = String(schoolSettings['Logo Kop Sekolah'] || '').trim();
+            const safeSchoolName = escapeCardHtml_(schoolName);
+            const safeLogoUrl = /^https:\/\/[^\s"'<>]+$/i.test(schoolLogo) ? escapeCardHtml_(schoolLogo) : '';
+
             allStudentsCache.forEach(s => {
                 const card = document.createElement('div');
-                card.className = "print-card bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden relative w-full max-w-[320px] h-[200px] flex transition-transform hover:scale-105";
+                card.className = "print-card bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden relative w-full max-w-[340px] h-[210px] flex transition-transform hover:scale-[1.02]";
+                const studentName = escapeCardHtml_(String(s.nama == null ? '' : s.nama));
+                const studentNis = escapeCardHtml_(String(s.nis == null ? '' : s.nis));
+                const studentClass = escapeCardHtml_(String(s.kelas == null ? '' : s.kelas));
+
                 card.innerHTML = `
-                    <div class="bg-blue-700 w-[80px] flex flex-col items-center justify-center text-white p-3 text-center shrink-0 shadow-[4px_0_10px_rgba(0,0,0,0.1)] z-10">
-                        <i class="fas fa-graduation-cap text-3xl mb-2"></i>
-                        <div class="text-[10px] font-black leading-tight tracking-widest uppercase">ID CARD<br>SISWA</div>
+                    <div class="w-[78px] flex flex-col items-center justify-center text-white p-3 text-center shrink-0 relative overflow-hidden" style="background:linear-gradient(155deg,#1747b8 0%,#2563eb 58%,#0891b2 100%);">
+                        <div class="absolute -top-7 -left-7 w-24 h-24 rounded-full border border-white/15"></div>
+                        <div class="absolute -bottom-8 -right-7 w-24 h-24 rounded-full bg-white/10"></div>
+                        <i class="fas fa-graduation-cap text-3xl mb-2 relative z-10"></i>
+                        <div class="text-[9px] font-black leading-tight tracking-[.14em] uppercase relative z-10">KARTU<br>PELAJAR</div>
+                        <div class="mt-2 w-8 h-1 rounded-full bg-cyan-200/90 relative z-10"></div>
                     </div>
-                    <div class="flex-1 p-5 flex flex-col justify-between overflow-hidden bg-slate-50 relative">
-                        <i class="fas fa-qrcode absolute text-8xl text-slate-200 -bottom-4 -right-4 opacity-50 pointer-events-none"></i>
-                        <div class="z-20 relative">
-                            <h4 class="font-black text-slate-800 uppercase text-sm leading-snug mb-1.5 truncate" title="${s.nama}">${s.nama}</h4>
-                            <p class="text-[11px] font-bold text-slate-500 mb-0.5">NIS: <span class="text-slate-700">${s.nis}</span></p>
-                            <p class="text-[11px] font-bold text-slate-500">Kelas: <span class="text-slate-700">${s.kelas}</span></p>
+                    <div class="flex-1 min-w-0 p-3.5 flex flex-col overflow-hidden relative" style="background:linear-gradient(145deg,#ffffff 0%,#f3f7ff 100%);">
+                        <div class="absolute -bottom-7 -right-5 text-slate-200/60 pointer-events-none">
+                            <i class="fas fa-qrcode text-8xl"></i>
                         </div>
-                        <div class="flex justify-end mt-2 z-20 relative">
-                            <div class="bg-white p-1.5 rounded-xl shadow-sm border border-slate-100">
-                                <div class="qr-code-container w-[64px] h-[64px]"></div>
+                        <div class="relative z-10 flex items-center gap-2 border-b border-blue-100 pb-2 mb-2 min-w-0">
+                            ${safeLogoUrl ? `<img src="${safeLogoUrl}" alt="Logo sekolah" class="w-8 h-8 object-contain rounded-md bg-white p-0.5 border border-slate-100 shrink-0" onerror="this.style.display='none'">` : `<div class="w-8 h-8 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center shrink-0"><i class="fas fa-school text-sm"></i></div>`}
+                            <div class="min-w-0 flex-1">
+                                <div class="text-[9px] font-black uppercase tracking-[.08em] text-blue-800 leading-tight truncate" title="${safeSchoolName}">${safeSchoolName}</div>
+                                <div class="text-[8px] font-bold tracking-wider text-slate-400 uppercase mt-0.5">KARTU IDENTITAS SISWA</div>
                             </div>
                         </div>
+                        <div class="relative z-10 min-w-0">
+                            <h4 class="font-black text-slate-800 uppercase text-[13px] leading-snug mb-1.5 truncate" title="${studentName}">${studentName}</h4>
+                            <p class="text-[10px] font-bold text-slate-500 mb-0.5">NIS: <span class="text-slate-800">${studentNis}</span></p>
+                            <p class="text-[10px] font-bold text-slate-500">Kelas: <span class="text-slate-800">${studentClass}</span></p>
+                        </div>
+                        <div class="flex justify-end mt-auto pt-1 relative z-10">
+                            <div class="bg-white p-1 rounded-lg shadow-sm border border-blue-100">
+                                <div class="qr-code-container w-[62px] h-[62px]"></div>
+                            </div>
+                        </div>
+                        <div class="absolute bottom-2 left-3 text-[7px] font-bold tracking-[.12em] text-blue-300 uppercase">E-HADIR DIGITAL</div>
                     </div>
                 `;
                 area.appendChild(card);
 
-                // Cari wadah QR dari kartu ini sendiri, bukan memakai ID global.
-                // Ini mencegah QR hilang bila ada ID siswa yang sama pada dua kartu.
                 const qrContainer = card.querySelector('.qr-code-container');
                 const studentId = String(s.id == null ? '' : s.id).trim();
                 if (!studentId) {
                     qrGagal++;
-                    qrContainer.innerHTML = '<span style="display:flex;width:64px;height:64px;align-items:center;justify-content:center;font-size:9px;text-align:center;color:#b91c1c;line-height:1.1">ID SISWA<br>KOSONG</span>';
+                    qrContainer.innerHTML = '<span style="display:flex;width:62px;height:62px;align-items:center;justify-content:center;font-size:9px;text-align:center;color:#b91c1c;line-height:1.1">ID SISWA<br>KOSONG</span>';
                     return;
                 }
                 try {
                     new QRCode(qrContainer, {
                         text: studentId,
-                        width: 64,
-                        height: 64,
-                        colorDark: "#0f172a",
+                        width: 62,
+                        height: 62,
+                        colorDark: "#10264a",
                         colorLight: "#ffffff",
                         correctLevel: QRCode.CorrectLevel.M
                     });
                 } catch (err) {
                     qrGagal++;
-                    qrContainer.innerHTML = '<span style="display:flex;width:64px;height:64px;align-items:center;justify-content:center;font-size:9px;text-align:center;color:#b91c1c;line-height:1.1">QR GAGAL</span>';
+                    qrContainer.innerHTML = '<span style="display:flex;width:62px;height:62px;align-items:center;justify-content:center;font-size:9px;text-align:center;color:#b91c1c;line-height:1.1">QR GAGAL</span>';
                     console.error('Gagal membuat QR untuk siswa:', studentId, err);
                 }
             });
+
             if (qrGagal) {
                 showToast(`Kartu dibuat: ${allStudentsCache.length}. QR tidak dapat dibuat pada ${qrGagal} kartu karena ID siswa kosong atau QR gagal. Periksa ID siswa tersebut.`, "error");
             } else {
-                showToast(`Berhasil men-generate ${allStudentsCache.length} kartu. Siap dicetak!`, "success");
+                showToast(`Berhasil men-generate ${allStudentsCache.length} kartu dengan identitas sekolah. Siap dicetak!`, "success");
             }
+        }
+
+        function escapeCardHtml_(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]);
+            });
         }
 
         function toggleSound() {
