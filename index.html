@@ -1497,9 +1497,9 @@
 (function () {
   // KONFIGURASI MASTER: isi nilai untuk instalasi sekolah ini.
   const EHADIR_CONFIG = window.EHADIR_CONFIG || {
-    workerUrl: 'https://GANTI-NAMA-WORKER-ANDA.workers.dev',
+    workerUrl: 'https://ehadirsekolah1.ahmad-ramlan-mei.workers.dev/',
     schoolName: 'NAMA SEKOLAH',
-    vapidPublicKey: 'GANTI_DENGAN_VAPID_PUBLIC_KEY'
+    vapidPublicKey: '"BEiI0cXID97bEcojGIHPucVGqGEN1HOqM6_RCDUiJwVXqHPQyafIL8kcpR7HMyOAjjrEiFteNp6DjN0-ViBHSy4",'
   };
   const WORKER_API_URL = String(EHADIR_CONFIG.workerUrl || '').replace(/\/+$/, '') + '/api';
   if (!EHADIR_CONFIG.workerUrl || EHADIR_CONFIG.workerUrl.includes('GANTI-NAMA')) {
