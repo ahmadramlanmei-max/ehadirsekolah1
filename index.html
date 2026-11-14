@@ -1423,11 +1423,11 @@
                                     <th class="p-4 pl-6">ID QR</th>
                                     <th class="p-4">NIS</th>
                                     <th class="p-4">Nama Lengkap</th>
-                                    <th class="p-4 pr-6">Kelas</th>
+                                    <th class="p-4">Kelas</th>\n                                    <th class="p-4 pr-6 text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="siswa-table-body" class="text-sm divide-y divide-slate-100">
-                                <tr><td colspan="4" class="p-10 text-center text-slate-400 font-medium">Memuat data dari server...</td></tr>
+                                <tr><td colspan="5" class="p-10 text-center text-slate-400 font-medium">Memuat data dari server...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1862,7 +1862,64 @@
     </main>
 
     <!-- MODAL TAMBAH 1 SISWA -->
-    <div id="modal-siswa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] hidden flex items-center justify-center">
+    
+    <div id="modal-edit-siswa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] hidden items-center justify-center overflow-y-auto">
+        <div class="bg-white rounded-[2rem] w-full max-w-lg p-6 md:p-8 m-4 shadow-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <div>
+                    <h3 class="text-xl font-extrabold text-slate-800">Edit Data Siswa</h3>
+                    <p class="text-xs text-slate-500 mt-1">Perubahan hanya berlaku pada data siswa aktif.</p>
+                </div>
+                <button type="button" onclick="closeModal('modal-edit-siswa')" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form onsubmit="submitEditSiswa(event)" class="space-y-4">
+                <input type="hidden" id="edit-siswa-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ID QR (tidak diubah)</label>
+                    <input id="edit-siswa-id-view" readonly class="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-500">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">NIS</label>
+                        <input id="edit-siswa-nis" required maxlength="30" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">NISN</label>
+                        <input id="edit-siswa-nisn" maxlength="30" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
+                    <input id="edit-siswa-nama" required maxlength="150" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kelas</label>
+                        <input id="edit-siswa-kelas" required maxlength="30" placeholder="Contoh: VII atau VII A" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jenis Kelamin</label>
+                        <select id="edit-siswa-jk" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white">
+                            <option value="">Belum diisi</option>
+                            <option value="L">Laki-laki</option>
+                            <option value="P">Perempuan</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
+                    <i class="fas fa-shield-alt mr-1"></i> ID QR, status aktif/alumni, arsip tahunan, dan riwayat absensi tidak diubah oleh fitur ini.
+                </div>
+                <div class="flex gap-2 justify-end pt-2">
+                    <button type="button" onclick="closeModal('modal-edit-siswa')" class="px-5 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold">Batal</button>
+                    <button type="submit" class="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"><i class="fas fa-save mr-1"></i> Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<div id="modal-siswa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] hidden flex items-center justify-center">
         <div class="bg-white rounded-[2rem] w-full max-w-md p-8 m-4 shadow-2xl">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-extrabold text-slate-800">Tambah Data Siswa</h3>
@@ -3416,30 +3473,88 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function renderTableSiswa(data) {
             const kelasFilter = document.getElementById('siswa-filter-kelas') ? document.getElementById('siswa-filter-kelas').value : 'semua';
-            
             let filtered = data;
-            if (kelasFilter !== 'semua') {
-                filtered = data.filter(s => s.kelas === kelasFilter);
-            }
-            
+            if (kelasFilter !== 'semua') filtered = data.filter(s => s.kelas === kelasFilter);
+
             const tbody = document.getElementById('siswa-table-body');
             tbody.innerHTML = '';
-            
-            if(filtered.length === 0) { 
-                tbody.innerHTML = `<tr><td colspan="4" class="p-10 text-center text-slate-400 font-medium">Tidak ada data siswa.</td></tr>`; 
-                return; 
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400 font-medium">Tidak ada data siswa.</td></tr>`;
+                return;
             }
 
             filtered.forEach(s => {
-                let tr = `
-                <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
-                    <td class="p-4 pl-6 font-mono text-xs font-bold text-blue-600">${s.id}</td>
-                    <td class="p-4 font-medium text-slate-700">${s.nis}</td>
-                    <td class="p-4 font-bold text-slate-800">${s.nama}</td>
-                    <td class="p-4 pr-6 text-slate-600">${s.kelas}</td>
-                </tr>`;
-                tbody.innerHTML += tr;
+                const safeId = escapeHtmlIzin(s.id || '');
+                const safeNis = escapeHtmlIzin(s.nis || '');
+                const safeNama = escapeHtmlIzin(s.nama || '');
+                const safeKelas = escapeHtmlIzin(s.kelas || '');
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 pl-6 font-mono text-xs font-bold text-blue-600">${safeId}</td>
+                    <td class="p-4 font-medium text-slate-700">${safeNis}</td>
+                    <td class="p-4 font-bold text-slate-800">${safeNama}</td>
+                    <td class="p-4 text-slate-600">${safeKelas}</td>
+                    <td class="p-3 pr-6 text-center">
+                        <button type="button" onclick="openEditSiswa(this.dataset.id)" data-id="${safeId}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs">
+                            <i class="fas fa-pen"></i><span>Edit</span>
+                        </button>
+                    </td>`;
+                tbody.appendChild(tr);
             });
+        }
+
+        function openEditSiswa(studentId) {
+            if (!currentUser || String(currentUser.role || '').toLowerCase() !== 'admin') {
+                showToast('Hanya Admin yang dapat mengedit data siswa.', 'error');
+                return;
+            }
+            const student = (allStudentsCache || []).find(s => String(s.id) === String(studentId));
+            if (!student) {
+                showToast('Data siswa tidak ditemukan. Muat ulang daftar siswa.', 'error');
+                return;
+            }
+            document.getElementById('edit-siswa-id').value = student.id || '';
+            document.getElementById('edit-siswa-id-view').value = student.id || '';
+            document.getElementById('edit-siswa-nis').value = student.nis || '';
+            document.getElementById('edit-siswa-nisn').value = student.nisn || '';
+            document.getElementById('edit-siswa-nama').value = student.nama || '';
+            document.getElementById('edit-siswa-kelas').value = student.kelas || '';
+            document.getElementById('edit-siswa-jk').value = student.jk || '';
+            showModal('modal-edit-siswa');
+        }
+
+        function submitEditSiswa(event) {
+            event.preventDefault();
+            if (!currentUser || String(currentUser.role || '').toLowerCase() !== 'admin') {
+                showToast('Hanya Admin yang dapat mengedit data siswa.', 'error');
+                return;
+            }
+            const updated = {
+                id: document.getElementById('edit-siswa-id').value,
+                nis: document.getElementById('edit-siswa-nis').value.trim(),
+                nisn: document.getElementById('edit-siswa-nisn').value.trim(),
+                nama: document.getElementById('edit-siswa-nama').value.trim(),
+                kelas: document.getElementById('edit-siswa-kelas').value.trim(),
+                jk: document.getElementById('edit-siswa-jk').value
+            };
+            showLoading('Menyimpan perubahan data siswa...');
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading();
+                    if (res && res.status === 'success') {
+                        closeModal('modal-edit-siswa');
+                        showToast(res.message || 'Data siswa berhasil diperbarui.', 'success');
+                        loadStudents();
+                    } else {
+                        showToast((res && res.message) || 'Gagal memperbarui data siswa.', 'error');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showToast('Gagal menyimpan: ' + (error && error.message ? error.message : error), 'error');
+                })
+                .apiUpdateStudent(currentUser.sessionToken, updated);
         }
 
         // Ekspor laporan resmi ke XLSX. Mengambil hasil filter yang sedang tampil,
