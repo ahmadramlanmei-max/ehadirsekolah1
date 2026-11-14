@@ -1423,11 +1423,11 @@
                                     <th class="p-4 pl-6">ID QR</th>
                                     <th class="p-4">NIS</th>
                                     <th class="p-4">Nama Lengkap</th>
-                                    <th class="p-4">Kelas</th>\n                                    <th class="p-4 pr-6 text-center">Aksi</th>
+                                    <th class="p-4 pr-6">Kelas</th>
                                 </tr>
                             </thead>
                             <tbody id="siswa-table-body" class="text-sm divide-y divide-slate-100">
-                                <tr><td colspan="5" class="p-10 text-center text-slate-400 font-medium">Memuat data dari server...</td></tr>
+                                <tr><td colspan="4" class="p-10 text-center text-slate-400 font-medium">Memuat data dari server...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1763,6 +1763,7 @@
               <div><h2 class="text-2xl font-extrabold text-slate-800"><i class="fas fa-calendar-alt text-blue-600 mr-2"></i>Manajemen Tahun Ajaran</h2><p class="text-sm text-slate-500 mt-1">Arsip tahunan, kenaikan kelas, alumni, dan pencarian riwayat kehadiran lintas tahun.</p></div>
               <div class="grid md:grid-cols-3 gap-4"><div class="bg-white rounded-2xl p-5 shadow-sm border"><p class="text-xs text-slate-500">Tahun Ajaran Aktif</p><div id="eh-year-active" class="text-2xl font-extrabold mt-1">-</div></div><div class="bg-white rounded-2xl p-5 shadow-sm border"><p class="text-xs text-slate-500">Siswa Aktif</p><div id="eh-year-students" class="text-2xl font-extrabold mt-1">-</div></div><div class="bg-white rounded-2xl p-5 shadow-sm border"><p class="text-xs text-slate-500">Data Absensi Aktif</p><div id="eh-year-attendance" class="text-2xl font-extrabold mt-1">-</div></div></div>
               <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Buat Arsip Tahun Ajaran</h3><p class="text-sm text-slate-600">Aplikasi menyalin data siswa, absensi, pengajuan izin/sakit, dan log aktivitas ke spreadsheet baru. Data aktif tidak dihapus.</p><div class="flex flex-wrap gap-2"><input id="eh-archive-year" class="border rounded-xl px-3 py-2" placeholder="2026/2027"><button onclick="createEhadirArchive()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 font-semibold">Buat & Verifikasi Arsip</button><button onclick="loadEhadirYearManagement()" class="bg-slate-100 rounded-xl px-4 py-2">Muat Ulang</button></div><div id="eh-archive-result" class="text-sm"></div></div>
+              <div class="bg-white rounded-2xl p-5 shadow-sm border border-amber-200 space-y-3"><h3 class="font-bold text-lg"><i class="fas fa-broom text-amber-600 mr-2"></i>Kosongkan Absensi Tahun yang Sudah Diarsipkan</h3><p class="text-sm text-slate-600">Menghapus hanya catatan absensi dari spreadsheet aktif untuk tahun ajaran yang dipilih. Arsip terverifikasi tidak diubah. Sistem akan membandingkan seluruh isi catatan dengan arsip sebelum menghapus; jika berbeda, proses dibatalkan.</p><div class="flex flex-wrap gap-2"><select id="eh-clear-archive-year" class="border rounded-xl px-3 py-2 min-w-48"><option value="">Pilih arsip terverifikasi</option></select><button onclick="clearEhadirArchivedAttendance()" class="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 font-semibold"><i class="fas fa-trash-alt mr-1"></i>Kosongkan Absensi</button></div><div class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3">Wajib arsip berstatus TERVERIFIKASI. Setelah penghapusan, data lama tetap tersedia melalui Pencarian Riwayat Kehadiran Lintas Tahun.</div><div id="eh-clear-archive-result" class="text-sm"></div></div>
               <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Kenaikan Kelas dan Alumni</h3><p class="text-sm text-amber-700 bg-amber-50 rounded-xl p-3">Wajib membuat arsip tahun aktif terlebih dahulu. Kelas VII menjadi VIII, VIII menjadi IX, dan IX menjadi Alumni. Perubahan ini tidak menghapus data absensi.</p><div class="flex flex-wrap gap-2"><input id="eh-next-year" class="border rounded-xl px-3 py-2" placeholder="Tahun ajaran baru, mis. 2027/2028"><button onclick="promoteEhadirStudents()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">Proses Kenaikan Kelas</button></div><div id="eh-promotion-result" class="text-sm"></div></div>
               <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Daftar Arsip</h3><div id="eh-archive-list" class="text-sm text-slate-500">Memuat...</div></div>
               <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Pencarian Riwayat Kehadiran Lintas Tahun</h3><div class="flex flex-wrap gap-2"><input id="eh-history-query" class="border rounded-xl px-3 py-2 flex-1 min-w-48" placeholder="Masukkan nama atau NIS"><select id="eh-history-year" class="border rounded-xl px-3 py-2"><option value="">Semua tahun</option></select><button onclick="searchEhadirHistory()" class="bg-indigo-600 text-white rounded-xl px-4 py-2 font-semibold">Cari Riwayat</button></div><div id="eh-history-result" class="text-sm text-slate-600">Cari berdasarkan nama atau NIS.</div></div>
@@ -1862,64 +1863,7 @@
     </main>
 
     <!-- MODAL TAMBAH 1 SISWA -->
-    
-    <div id="modal-edit-siswa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] hidden items-center justify-center overflow-y-auto">
-        <div class="bg-white rounded-[2rem] w-full max-w-lg p-6 md:p-8 m-4 shadow-2xl">
-            <div class="flex justify-between items-center mb-5">
-                <div>
-                    <h3 class="text-xl font-extrabold text-slate-800">Edit Data Siswa</h3>
-                    <p class="text-xs text-slate-500 mt-1">Perubahan hanya berlaku pada data siswa aktif.</p>
-                </div>
-                <button type="button" onclick="closeModal('modal-edit-siswa')" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <form onsubmit="submitEditSiswa(event)" class="space-y-4">
-                <input type="hidden" id="edit-siswa-id">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ID QR (tidak diubah)</label>
-                    <input id="edit-siswa-id-view" readonly class="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-500">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">NIS</label>
-                        <input id="edit-siswa-nis" required maxlength="30" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">NISN</label>
-                        <input id="edit-siswa-nisn" maxlength="30" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
-                    <input id="edit-siswa-nama" required maxlength="150" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kelas</label>
-                        <input id="edit-siswa-kelas" required maxlength="30" placeholder="Contoh: VII atau VII A" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jenis Kelamin</label>
-                        <select id="edit-siswa-jk" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white">
-                            <option value="">Belum diisi</option>
-                            <option value="L">Laki-laki</option>
-                            <option value="P">Perempuan</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
-                    <i class="fas fa-shield-alt mr-1"></i> ID QR, status aktif/alumni, arsip tahunan, dan riwayat absensi tidak diubah oleh fitur ini.
-                </div>
-                <div class="flex gap-2 justify-end pt-2">
-                    <button type="button" onclick="closeModal('modal-edit-siswa')" class="px-5 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold">Batal</button>
-                    <button type="submit" class="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"><i class="fas fa-save mr-1"></i> Simpan Perubahan</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-<div id="modal-siswa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] hidden flex items-center justify-center">
+    <div id="modal-siswa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] hidden flex items-center justify-center">
         <div class="bg-white rounded-[2rem] w-full max-w-md p-8 m-4 shadow-2xl">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-extrabold text-slate-800">Tambah Data Siswa</h3>
@@ -2428,6 +2372,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('eh-year-attendance').textContent=r.jumlahAbsensi||0;
             const inp=document.getElementById('eh-archive-year');if(inp&&!inp.value)inp.value=r.tahunAktif||'';
             const sel=document.getElementById('eh-history-year'); if(sel){const old=sel.value;sel.innerHTML='<option value="">Semua tahun</option>'+`<option value="${ehEscape(r.tahunAktif||'')}">${ehEscape(r.tahunAktif||'')} (Aktif)</option>`+(r.arsip||[]).map(a=>`<option value="${ehEscape(a.tahun)}">${ehEscape(a.tahun)}</option>`).join('');sel.value=old;}
+            const clearSel=document.getElementById('eh-clear-archive-year'); if(clearSel){const oldClear=clearSel.value;clearSel.innerHTML='<option value="">Pilih arsip terverifikasi</option>'+(r.arsip||[]).filter(a=>a.status==='TERVERIFIKASI').map(a=>`<option value="${ehEscape(a.tahun)}">${ehEscape(a.tahun)} · ${a.absensi} absensi</option>`).join('');if(oldClear && Array.from(clearSel.options).some(o=>o.value===oldClear))clearSel.value=oldClear;}
             if(list)list.innerHTML=(r.arsip||[]).length?'<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">Tahun</th><th class="p-2">Siswa</th><th class="p-2">Absensi</th><th class="p-2">Status</th><th class="p-2">Tautan</th></tr></thead><tbody>'+(r.arsip||[]).map(a=>`<tr class="border-b"><td class="p-2">${ehEscape(a.tahun)}</td><td class="p-2">${a.siswa}</td><td class="p-2">${a.absensi}</td><td class="p-2">${ehEscape(a.status)}</td><td class="p-2"><a class="text-blue-600 underline" target="_blank" rel="noopener" href="${ehEscape(a.url)}">Buka arsip</a></td></tr>`).join('')+'</tbody></table></div>':'Belum ada arsip tahun ajaran.';
           }).withFailureHandler(e=>{if(list)list.textContent=e.message||'Gagal terhubung';}).apiGetYearManagement(currentUser.sessionToken);
         }
@@ -2436,6 +2381,19 @@ document.addEventListener('DOMContentLoaded', function () {
           const out=document.getElementById('eh-archive-result');out.textContent='Sedang menyalin dan memverifikasi data...';
           google.script.run.withSuccessHandler(r=>{out.innerHTML=r.status==='success'?`<span class="text-emerald-700">${ehEscape(r.message)} Jumlah siswa: ${r.jumlahSiswa}; absensi: ${r.jumlahAbsensi}. <a class="underline" target="_blank" rel="noopener" href="${ehEscape(r.url)}">Buka spreadsheet arsip</a></span>`:`<span class="text-red-600">${ehEscape(r.message)}</span>`;loadEhadirYearManagement();}).withFailureHandler(e=>out.textContent=e.message||'Gagal').apiCreateAnnualArchive(currentUser.sessionToken,year);
         }
+        function clearEhadirArchivedAttendance(){
+          if(!currentUser||currentUser.role!=='admin'){showToast('Hanya Admin yang dapat mengosongkan absensi.','error');return;}
+          const year=document.getElementById('eh-clear-archive-year').value;
+          if(!year){showToast('Pilih arsip tahun ajaran yang sudah terverifikasi.','error');return;}
+          const typed=prompt('PERINGATAN: Catatan absensi tahun '+year+' akan dihapus dari spreadsheet AKTIF saja. Arsip tidak dihapus.\n\nUntuk konfirmasi, ketik persis: HAPUS '+year);
+          if(typed===null)return;
+          const out=document.getElementById('eh-clear-archive-result');out.textContent='Memeriksa kesesuaian data aktif dengan arsip...';
+          google.script.run.withSuccessHandler(r=>{
+            if(r&&r.status==='success'){out.innerHTML='<span class="text-emerald-700">'+ehEscape(r.message)+' Jumlah baris dihapus: '+Number(r.dihapus||0)+'.</span>';showToast('Pengosongan absensi selesai.','success');loadEhadirYearManagement();}
+            else{out.innerHTML='<span class="text-red-600">'+ehEscape(r&&r.message||'Pengosongan dibatalkan.')+'</span>';}
+          }).withFailureHandler(e=>{out.textContent=e.message||'Gagal terhubung';}).apiClearArchivedAttendance(currentUser.sessionToken,year,typed.trim());
+        }
+
         function promoteEhadirStudents(){
           const year=document.getElementById('eh-next-year').value.trim();
           if(!confirm('Pastikan arsip tahun aktif sudah dibuat dan diverifikasi. Lanjutkan kenaikan kelas dan penandaan siswa kelas IX sebagai Alumni?'))return;
@@ -3473,88 +3431,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function renderTableSiswa(data) {
             const kelasFilter = document.getElementById('siswa-filter-kelas') ? document.getElementById('siswa-filter-kelas').value : 'semua';
+            
             let filtered = data;
-            if (kelasFilter !== 'semua') filtered = data.filter(s => s.kelas === kelasFilter);
-
+            if (kelasFilter !== 'semua') {
+                filtered = data.filter(s => s.kelas === kelasFilter);
+            }
+            
             const tbody = document.getElementById('siswa-table-body');
             tbody.innerHTML = '';
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400 font-medium">Tidak ada data siswa.</td></tr>`;
-                return;
+            
+            if(filtered.length === 0) { 
+                tbody.innerHTML = `<tr><td colspan="4" class="p-10 text-center text-slate-400 font-medium">Tidak ada data siswa.</td></tr>`; 
+                return; 
             }
 
             filtered.forEach(s => {
-                const safeId = escapeHtmlIzin(s.id || '');
-                const safeNis = escapeHtmlIzin(s.nis || '');
-                const safeNama = escapeHtmlIzin(s.nama || '');
-                const safeKelas = escapeHtmlIzin(s.kelas || '');
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
-                tr.innerHTML = `
-                    <td class="p-4 pl-6 font-mono text-xs font-bold text-blue-600">${safeId}</td>
-                    <td class="p-4 font-medium text-slate-700">${safeNis}</td>
-                    <td class="p-4 font-bold text-slate-800">${safeNama}</td>
-                    <td class="p-4 text-slate-600">${safeKelas}</td>
-                    <td class="p-3 pr-6 text-center">
-                        <button type="button" onclick="openEditSiswa(this.dataset.id)" data-id="${safeId}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs">
-                            <i class="fas fa-pen"></i><span>Edit</span>
-                        </button>
-                    </td>`;
-                tbody.appendChild(tr);
+                let tr = `
+                <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+                    <td class="p-4 pl-6 font-mono text-xs font-bold text-blue-600">${s.id}</td>
+                    <td class="p-4 font-medium text-slate-700">${s.nis}</td>
+                    <td class="p-4 font-bold text-slate-800">${s.nama}</td>
+                    <td class="p-4 pr-6 text-slate-600">${s.kelas}</td>
+                </tr>`;
+                tbody.innerHTML += tr;
             });
-        }
-
-        function openEditSiswa(studentId) {
-            if (!currentUser || String(currentUser.role || '').toLowerCase() !== 'admin') {
-                showToast('Hanya Admin yang dapat mengedit data siswa.', 'error');
-                return;
-            }
-            const student = (allStudentsCache || []).find(s => String(s.id) === String(studentId));
-            if (!student) {
-                showToast('Data siswa tidak ditemukan. Muat ulang daftar siswa.', 'error');
-                return;
-            }
-            document.getElementById('edit-siswa-id').value = student.id || '';
-            document.getElementById('edit-siswa-id-view').value = student.id || '';
-            document.getElementById('edit-siswa-nis').value = student.nis || '';
-            document.getElementById('edit-siswa-nisn').value = student.nisn || '';
-            document.getElementById('edit-siswa-nama').value = student.nama || '';
-            document.getElementById('edit-siswa-kelas').value = student.kelas || '';
-            document.getElementById('edit-siswa-jk').value = student.jk || '';
-            showModal('modal-edit-siswa');
-        }
-
-        function submitEditSiswa(event) {
-            event.preventDefault();
-            if (!currentUser || String(currentUser.role || '').toLowerCase() !== 'admin') {
-                showToast('Hanya Admin yang dapat mengedit data siswa.', 'error');
-                return;
-            }
-            const updated = {
-                id: document.getElementById('edit-siswa-id').value,
-                nis: document.getElementById('edit-siswa-nis').value.trim(),
-                nisn: document.getElementById('edit-siswa-nisn').value.trim(),
-                nama: document.getElementById('edit-siswa-nama').value.trim(),
-                kelas: document.getElementById('edit-siswa-kelas').value.trim(),
-                jk: document.getElementById('edit-siswa-jk').value
-            };
-            showLoading('Menyimpan perubahan data siswa...');
-            google.script.run
-                .withSuccessHandler(function(res) {
-                    hideLoading();
-                    if (res && res.status === 'success') {
-                        closeModal('modal-edit-siswa');
-                        showToast(res.message || 'Data siswa berhasil diperbarui.', 'success');
-                        loadStudents();
-                    } else {
-                        showToast((res && res.message) || 'Gagal memperbarui data siswa.', 'error');
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showToast('Gagal menyimpan: ' + (error && error.message ? error.message : error), 'error');
-                })
-                .apiUpdateStudent(currentUser.sessionToken, updated);
         }
 
         // Ekspor laporan resmi ke XLSX. Mengambil hasil filter yang sedang tampil,
