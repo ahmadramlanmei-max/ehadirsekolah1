@@ -1034,6 +1034,7 @@
             <a href="javascript:void(0)" onclick="switchView('pengaturan')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition-all font-medium" data-target="pengaturan">
                 <i class="fas fa-cog text-lg w-5 text-center"></i> Pengaturan
             </a>
+            <a href="javascript:void(0)" onclick="switchView('tahunajaran')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition-all font-medium admin-only" data-target="tahunajaran"><i class="fas fa-calendar-alt text-lg w-5 text-center"></i> Tahun Ajaran & Alumni</a>
             <a href="javascript:void(0)" onclick="switchView('akun')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white transition-all font-medium admin-only" data-target="akun">
                 <i class="fas fa-user-shield text-lg w-5 text-center"></i> Manajemen Akun
             </a>
@@ -1758,6 +1759,15 @@
                 </div>
             </div>
             
+            <section id="view-tahunajaran" class="view-section p-4 md:p-8"><div class="max-w-6xl mx-auto space-y-6">
+              <div><h2 class="text-2xl font-extrabold text-slate-800"><i class="fas fa-calendar-alt text-blue-600 mr-2"></i>Manajemen Tahun Ajaran</h2><p class="text-sm text-slate-500 mt-1">Arsip tahunan, kenaikan kelas, alumni, dan pencarian riwayat kehadiran lintas tahun.</p></div>
+              <div class="grid md:grid-cols-3 gap-4"><div class="bg-white rounded-2xl p-5 shadow-sm border"><p class="text-xs text-slate-500">Tahun Ajaran Aktif</p><div id="eh-year-active" class="text-2xl font-extrabold mt-1">-</div></div><div class="bg-white rounded-2xl p-5 shadow-sm border"><p class="text-xs text-slate-500">Siswa Aktif</p><div id="eh-year-students" class="text-2xl font-extrabold mt-1">-</div></div><div class="bg-white rounded-2xl p-5 shadow-sm border"><p class="text-xs text-slate-500">Data Absensi Aktif</p><div id="eh-year-attendance" class="text-2xl font-extrabold mt-1">-</div></div></div>
+              <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Buat Arsip Tahun Ajaran</h3><p class="text-sm text-slate-600">Aplikasi menyalin data siswa, absensi, pengajuan izin/sakit, dan log aktivitas ke spreadsheet baru. Data aktif tidak dihapus.</p><div class="flex flex-wrap gap-2"><input id="eh-archive-year" class="border rounded-xl px-3 py-2" placeholder="2026/2027"><button onclick="createEhadirArchive()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 font-semibold">Buat & Verifikasi Arsip</button><button onclick="loadEhadirYearManagement()" class="bg-slate-100 rounded-xl px-4 py-2">Muat Ulang</button></div><div id="eh-archive-result" class="text-sm"></div></div>
+              <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Kenaikan Kelas dan Alumni</h3><p class="text-sm text-amber-700 bg-amber-50 rounded-xl p-3">Wajib membuat arsip tahun aktif terlebih dahulu. Kelas VII menjadi VIII, VIII menjadi IX, dan IX menjadi Alumni. Perubahan ini tidak menghapus data absensi.</p><div class="flex flex-wrap gap-2"><input id="eh-next-year" class="border rounded-xl px-3 py-2" placeholder="Tahun ajaran baru, mis. 2027/2028"><button onclick="promoteEhadirStudents()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">Proses Kenaikan Kelas</button></div><div id="eh-promotion-result" class="text-sm"></div></div>
+              <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Daftar Arsip</h3><div id="eh-archive-list" class="text-sm text-slate-500">Memuat...</div></div>
+              <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3"><h3 class="font-bold text-lg">Pencarian Riwayat Kehadiran Lintas Tahun</h3><div class="flex flex-wrap gap-2"><input id="eh-history-query" class="border rounded-xl px-3 py-2 flex-1 min-w-48" placeholder="Masukkan nama atau NIS"><select id="eh-history-year" class="border rounded-xl px-3 py-2"><option value="">Semua tahun</option></select><button onclick="searchEhadirHistory()" class="bg-indigo-600 text-white rounded-xl px-4 py-2 font-semibold">Cari Riwayat</button></div><div id="eh-history-result" class="text-sm text-slate-600">Cari berdasarkan nama atau NIS.</div></div>
+            </div></section>
+
             <div id="view-akun" class="view-section">
                 <div class="mb-6">
                     <h2 class="text-2xl font-extrabold text-slate-800">Manajemen Akun Pengguna</h2>
@@ -2284,6 +2294,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (target === 'notifikasi' && currentUser.role !== 'wali') el.classList.add('hidden');
                 if (target === 'monitor-notifikasi' && currentUser.role !== 'admin') el.classList.add('hidden');
                 if (target === 'akun' && currentUser.role !== 'admin') el.classList.add('hidden');
+                if (target === 'tahunajaran' && currentUser.role !== 'admin') el.classList.add('hidden');
             });
 
             const waliForm = document.getElementById('izin-form-wali');
@@ -2350,6 +2361,41 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
 
+        function loadEhadirYearManagement(){
+          if(!currentUser||currentUser.role!=='admin')return;
+          const list=document.getElementById('eh-archive-list'); if(list)list.textContent='Memuat daftar arsip...';
+          google.script.run.withSuccessHandler(r=>{
+            if(r.status!=='success'){if(list)list.textContent=r.message||'Gagal memuat.';return;}
+            document.getElementById('eh-year-active').textContent=r.tahunAktif||'-';
+            document.getElementById('eh-year-students').textContent=r.jumlahSiswa||0;
+            document.getElementById('eh-year-attendance').textContent=r.jumlahAbsensi||0;
+            const inp=document.getElementById('eh-archive-year');if(inp&&!inp.value)inp.value=r.tahunAktif||'';
+            const sel=document.getElementById('eh-history-year'); if(sel){const old=sel.value;sel.innerHTML='<option value="">Semua tahun</option>'+`<option value="${ehEscape(r.tahunAktif||'')}">${ehEscape(r.tahunAktif||'')} (Aktif)</option>`+(r.arsip||[]).map(a=>`<option value="${ehEscape(a.tahun)}">${ehEscape(a.tahun)}</option>`).join('');sel.value=old;}
+            if(list)list.innerHTML=(r.arsip||[]).length?'<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">Tahun</th><th class="p-2">Siswa</th><th class="p-2">Absensi</th><th class="p-2">Status</th><th class="p-2">Tautan</th></tr></thead><tbody>'+(r.arsip||[]).map(a=>`<tr class="border-b"><td class="p-2">${ehEscape(a.tahun)}</td><td class="p-2">${a.siswa}</td><td class="p-2">${a.absensi}</td><td class="p-2">${ehEscape(a.status)}</td><td class="p-2"><a class="text-blue-600 underline" target="_blank" rel="noopener" href="${ehEscape(a.url)}">Buka arsip</a></td></tr>`).join('')+'</tbody></table></div>':'Belum ada arsip tahun ajaran.';
+          }).withFailureHandler(e=>{if(list)list.textContent=e.message||'Gagal terhubung';}).apiGetYearManagement(currentUser.sessionToken);
+        }
+        function createEhadirArchive(){
+          const year=document.getElementById('eh-archive-year').value.trim(); if(!year){showToast('Isi tahun ajaran yang akan diarsipkan.','error');return;}
+          const out=document.getElementById('eh-archive-result');out.textContent='Sedang menyalin dan memverifikasi data...';
+          google.script.run.withSuccessHandler(r=>{out.innerHTML=r.status==='success'?`<span class="text-emerald-700">${ehEscape(r.message)} Jumlah siswa: ${r.jumlahSiswa}; absensi: ${r.jumlahAbsensi}. <a class="underline" target="_blank" rel="noopener" href="${ehEscape(r.url)}">Buka spreadsheet arsip</a></span>`:`<span class="text-red-600">${ehEscape(r.message)}</span>`;loadEhadirYearManagement();}).withFailureHandler(e=>out.textContent=e.message||'Gagal').apiCreateAnnualArchive(currentUser.sessionToken,year);
+        }
+        function promoteEhadirStudents(){
+          const year=document.getElementById('eh-next-year').value.trim();
+          if(!confirm('Pastikan arsip tahun aktif sudah dibuat dan diverifikasi. Lanjutkan kenaikan kelas dan penandaan siswa kelas IX sebagai Alumni?'))return;
+          const out=document.getElementById('eh-promotion-result');out.textContent='Memproses kenaikan kelas...';
+          google.script.run.withSuccessHandler(r=>{out.textContent=r.status==='success'?`${r.message} Naik kelas: ${r.naikKelas}; alumni: ${r.alumni}; tidak berubah: ${r.tidakBerubah}.`:(r.message||'Gagal');loadEhadirYearManagement();}).withFailureHandler(e=>out.textContent=e.message||'Gagal').apiPromoteStudents(currentUser.sessionToken,year);
+        }
+        function searchEhadirHistory(){
+          const q=document.getElementById('eh-history-query').value.trim(),year=document.getElementById('eh-history-year').value;
+          const out=document.getElementById('eh-history-result');out.textContent='Mencari riwayat...';
+          google.script.run.withSuccessHandler(r=>{
+            if(r.status!=='success'){out.textContent=r.message||'Pencarian gagal';return;}
+            const d=r.data||{},s=d.siswa;if(!d.detail||!d.detail.length){out.innerHTML='<p class="text-slate-500">Riwayat tidak ditemukan.</p>';return;}
+            const totals=d.ringkasan||{};
+            out.innerHTML=`<div class="mb-3"><strong>${ehEscape(s?s.nama:'Siswa')}</strong> · NIS ${ehEscape(s?s.nis:'-')} · Kelas/status terakhir: ${ehEscape(s?s.kelas+' / '+s.status:'-')}</div><div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">${['Hadir','Terlambat','Sakit','Izin','Alpa'].map(k=>`<div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">${k}</div><b class="text-xl">${totals[k]||0}</b></div>`).join('')}</div><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">Tahun</th><th class="p-2">Tanggal</th><th class="p-2">Waktu</th><th class="p-2">Kelas</th><th class="p-2">Status</th><th class="p-2">Keterangan</th></tr></thead><tbody>${d.detail.map(x=>`<tr class="border-b"><td class="p-2">${ehEscape(x.tahun)}</td><td class="p-2">${ehEscape(x.tanggal)}</td><td class="p-2">${ehEscape(x.waktu)}</td><td class="p-2">${ehEscape(x.kelas)}</td><td class="p-2">${ehEscape(x.status)}</td><td class="p-2">${ehEscape(x.keterangan)}</td></tr>`).join('')}</tbody></table></div>`;
+          }).withFailureHandler(e=>out.textContent=e.message||'Gagal terhubung').apiSearchStudentHistory(currentUser.sessionToken,q,year);
+        }
+
         // Notifikasi internal: selalu gunakan sesi server dan filter NIS di Apps Script.
         function ehEscape(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
         function loadWaliNotifications() {
@@ -2404,6 +2450,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Fitur Autofocus jika pindah ke Scanner
+            if(viewId === 'tahunajaran' && currentUser && currentUser.role==='admin') loadEhadirYearManagement();
+
             if(viewId === 'scanner') {
                 setTimeout(() => {
                     const manualInput = document.getElementById('manual-qr-input');
