@@ -2161,6 +2161,8 @@ document.addEventListener('DOMContentLoaded', function () {
         let allStudentsCache = [];
         let allRekapCache = []; 
         let lastScanTime = 0;
+        let scanProcessing = false;
+        let scanResultTimer = null;
         let autoSubmitTimer = null; 
 
         // MEMAKSA WAKTU LOKAL SELALU WIB / JAKARTA
@@ -2481,7 +2483,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('btn-stop-scan').classList.remove('hidden');
             document.getElementById('btn-switch-cam').classList.remove('hidden');
             
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            const config = { fps: 18, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0, rememberLastUsedCamera: true };
             
             // Coba Kamera Belakang, kalau error coba kamera depan
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
@@ -2518,7 +2520,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if(isScannerRunning) {
                 html5QrCode.stop().then(() => {
                     isFrontCam = !isFrontCam;
-                    html5QrCode.start({ facingMode: isFrontCam ? "user" : "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess)
+                    html5QrCode.start({ facingMode: isFrontCam ? "user" : "environment" }, { fps: 18, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0, rememberLastUsedCamera: true }, onScanSuccess)
                     .catch(err => {
                         showToast("Gagal membalik kamera.", "error");
                         isFrontCam = !isFrontCam; 
@@ -2529,7 +2531,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function onScanSuccess(decodedText) {
-            if (Date.now() - lastScanTime < 3500) return;
+            if (scanProcessing || Date.now() - lastScanTime < 850) return;
             lastScanTime = Date.now();
             processAttendance(decodedText);
         }
@@ -2583,7 +2585,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             if (submitButton) submitButton.click();
                         }
                     }
-                }, 500);
+                }, 180);
             }
         }
 
@@ -2595,7 +2597,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const qrId = inputEl.value.trim().toUpperCase();
 
             if (qrId === '') return;
-            if (Date.now() - lastScanTime < 2000) return;
+            if (scanProcessing || Date.now() - lastScanTime < 850) return;
 
             lastScanTime = Date.now();
             inputEl.value = '';
@@ -2605,10 +2607,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function processAttendance(qrId) {
+            if (scanProcessing) return;
             if (!currentUser || !currentUser.sessionToken) {
                 showToast("Silakan login kembali sebelum melakukan absensi.", "error");
                 return;
             }
+            scanProcessing = true;
             const jkt = getJakartaTime();
             const dateStr = ("0" + jkt.getDate()).slice(-2) + "/" + ("0" + (jkt.getMonth() + 1)).slice(-2) + "/" + jkt.getFullYear();
             const timeStr = ("0" + jkt.getHours()).slice(-2) + ":" + ("0" + jkt.getMinutes()).slice(-2) + ":" + ("0" + jkt.getSeconds()).slice(-2);
@@ -2622,16 +2626,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (result && result.status === 'error' && /Gagal menghubungi Apps Script|Respons Apps Script bukan JSON|Failed to fetch|NetworkError|fetch failed/i.test(message)) {
                         const savedOffline = await queueOfflineAttendance({transactionId, qrId, dateStr, timeStr, operator: currentUser.username, createdAt: new Date().toISOString()});
                         if (savedOffline) showOfflineQueuedResult(qrId, dateStr, timeStr);
+                        scanProcessing = false;
+                        lastScanTime = Date.now();
                         return;
                     }
                     handleScanResult(result, result.siswa || null, dateStr, timeStr);
                     if (result && result.status === 'success') refreshOfflineAttendanceStatus();
+                    scanProcessing = false;
+                    lastScanTime = Date.now();
                 })
                 .withFailureHandler(async function(error) {
                     hideLoading();
                     // Network-level failure only. Transaction ID is retained for safe retry after reconnect.
                     const savedOffline = await queueOfflineAttendance({transactionId, qrId, dateStr, timeStr, operator: currentUser.username, createdAt: new Date().toISOString()});
                     if (savedOffline) showOfflineQueuedResult(qrId, dateStr, timeStr);
+                    scanProcessing = false;
+                    lastScanTime = Date.now();
                 })
                 .apiScan(currentUser.sessionToken, qrId, dateStr, timeStr, currentUser.username, transactionId);
         }
@@ -2691,7 +2701,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 playVoice(`Kode QR tidak terdaftar.`);
             }
 
-            setTimeout(() => { 
+            if (scanResultTimer) clearTimeout(scanResultTimer);
+            scanResultTimer = setTimeout(() => {
                 resultUI.classList.add('hidden'); 
                 resultUI.classList.remove('flex');
                 idleUI.classList.remove('hidden'); 
@@ -2700,7 +2711,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if(manualInput && document.getElementById('view-scanner').classList.contains('active')) {
                     manualInput.focus();
                 }
-            }, 3000); 
+            }, 1500);
         }
 
         function loadDashboard() {
@@ -4793,7 +4804,7 @@ function biometricDemoDelete(id) {
         if (!faceModelsReady) throw new Error('Klik Muat Model Wajah terlebih dahulu.');
         const video = faceEl('face-video');
         if (!video || !video.srcObject || video.readyState < 2) throw new Error('Aktifkan kamera dan tunggu gambar muncul.');
-        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({inputSize: 320, scoreThreshold: 0.55}))
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({inputSize: 224, scoreThreshold: 0.55}))
             .withFaceLandmarks().withFaceDescriptors();
         if (detections.length !== 1) {
             throw new Error(detections.length === 0
@@ -4866,7 +4877,7 @@ function biometricDemoDelete(id) {
             }
             const detections = await faceapi.detectAllFaces(
                 video,
-                new faceapi.TinyFaceDetectorOptions({inputSize: 320, scoreThreshold: 0.55})
+                new faceapi.TinyFaceDetectorOptions({inputSize: 224, scoreThreshold: 0.55})
             ).withFaceLandmarks().withFaceDescriptors();
 
             if (!faceAutoScanActive) return;
@@ -4903,7 +4914,7 @@ function biometricDemoDelete(id) {
             }
         } finally {
             faceAutoScanInFlight = false;
-            if (faceAutoScanActive) faceAutoScanTimer = setTimeout(faceAutoScanTick, 1100);
+            if (faceAutoScanActive) faceAutoScanTimer = setTimeout(faceAutoScanTick, 650);
         }
     }
 
