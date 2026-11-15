@@ -1124,9 +1124,9 @@
                             </div>
                             <div class="bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center min-h-[220px] relative" id="face-camera-frame">
                                 <video id="face-video" class="w-full max-h-[420px] object-cover" autoplay muted playsinline></video>
-                                <div id="face-focus-guide" aria-hidden="true" class="pointer-events-none absolute inset-0 flex items-center justify-center">
-                                    <div class="w-[62%] h-[78%] max-w-[300px] rounded-[48%] border-[3px] border-emerald-400 shadow-[0_0_0_999px_rgba(2,6,23,0.20)] relative">
-                                        <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-wider">POSISIKAN WAJAH DI SINI</span>
+                                <div id="face-focus-guide" aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
+                                    <div id="face-focus-oval" class="absolute rounded-[48%] border-[3px] border-emerald-400 shadow-[0_0_0_999px_rgba(2,6,23,0.12)] transition-all duration-200 ease-out" style="left:50%;top:50%;width:42%;height:64%;transform:translate(-50%,-50%)">
+                                        <span id="face-focus-label" class="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-wider whitespace-nowrap">MENCARI WAJAH</span>
                                     </div>
                                 </div>
                             </div>
@@ -5187,6 +5187,44 @@ function biometricDemoDelete(id) {
         if (stop) stop.disabled = true;
     };
 
+    function faceUpdateFocusGuide(video, box, state) {
+        const frame = faceEl('face-camera-frame');
+        const oval = faceEl('face-focus-oval');
+        const label = faceEl('face-focus-label');
+        if (!frame || !oval || !video) return;
+        if (!box || !video.videoWidth || !video.videoHeight) {
+            oval.style.left = '50%';
+            oval.style.top = '50%';
+            oval.style.width = '42%';
+            oval.style.height = '64%';
+            oval.style.borderColor = '#34d399';
+            if (label) {
+                label.textContent = 'MENCARI WAJAH';
+                label.style.backgroundColor = '#059669';
+            }
+            return;
+        }
+        const frameRect = frame.getBoundingClientRect();
+        const videoRect = video.getBoundingClientRect();
+        const scale = Math.max(videoRect.width / video.videoWidth, videoRect.height / video.videoHeight);
+        const cropX = (video.videoWidth * scale - videoRect.width) / 2;
+        const cropY = (video.videoHeight * scale - videoRect.height) / 2;
+        const centerX = (box.x + box.width / 2) * scale - cropX + (videoRect.left - frameRect.left);
+        const centerY = (box.y + box.height / 2) * scale - cropY + (videoRect.top - frameRect.top);
+        const width = Math.min(frameRect.width * 0.88, Math.max(100, box.width * scale * 1.48));
+        const height = Math.min(frameRect.height * 0.90, Math.max(130, box.height * scale * 1.42));
+        oval.style.left = centerX + 'px';
+        oval.style.top = centerY + 'px';
+        oval.style.width = width + 'px';
+        oval.style.height = height + 'px';
+        oval.style.transform = 'translate(-50%,-50%)';
+        oval.style.borderColor = state === 'matched' ? '#22c55e' : '#38bdf8';
+        if (label) {
+            label.textContent = state === 'matched' ? 'WAJAH COCOK' : 'WAJAH TERDETEKSI';
+            label.style.backgroundColor = state === 'matched' ? '#16a34a' : '#0284c7';
+        }
+    }
+
     async function faceAutoScanTick() {
         if (!faceAutoScanActive || faceAutoScanInFlight) return;
         faceAutoScanInFlight = true;
@@ -5197,13 +5235,16 @@ function biometricDemoDelete(id) {
                 .withFaceLandmarks().withFaceDescriptors();
             if (!faceAutoScanActive) return;
             if (detections.length > 1) {
+                faceUpdateFocusGuide(video, null, 'search');
                 faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false;
                 faceStatus('face-verify-status', 'Terdeteksi lebih dari satu wajah. Pastikan hanya satu siswa di depan kamera.', true);
             } else if (detections.length === 1) {
+                faceUpdateFocusGuide(video, detections[0].detection.box, 'detected');
                 const descriptor = Array.from(detections[0].descriptor);
                 const result = await faceApiCall('apiFaceVerify', [descriptor]);
                 if (!faceAutoScanActive) return;
                 if (result.match && result.student) {
+                    faceUpdateFocusGuide(video, detections[0].detection.box, 'matched');
                     const candidateId = String(result.student.id);
                     // Hindari mengirim permintaan berulang ketika siswa yang sama masih di depan kamera.
                     if (candidateId === faceAutoLastRecordedId) {
@@ -5250,6 +5291,7 @@ function biometricDemoDelete(id) {
                     faceStatus('face-verify-status', result.message || 'Wajah belum cocok. Posisikan wajah tepat di dalam garis fokus dan pastikan pencahayaan cukup.', true);
                 }
             } else {
+                faceUpdateFocusGuide(video, null, 'search');
                 faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false;
                 faceAutoLastRecordedId = '';
                 faceLastVoiceState = '';
