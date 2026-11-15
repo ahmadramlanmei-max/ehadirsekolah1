@@ -1152,7 +1152,7 @@
 
                             <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 md:p-6">
                                 <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-user-check text-blue-600 mr-2"></i>Verifikasi dan Absensi</h3>
-                                <p class="text-sm text-slate-500 mt-1">Mode uji coba: tiga frame harus mengenali siswa yang sama sebelum absensi otomatis dicatat. Sistem ini belum memiliki liveness detection dan masih dapat tertipu foto/video; QR/manual tetap menjadi alternatif.</p>
+                                <p class="text-sm text-slate-500 mt-1">Mode uji coba: setelah tiga frame cocok, siswa diminta berkedip dan menggerakkan kepala ke arah acak. Pemeriksaan ini hanya liveness dasar, belum menjamin anti-spoofing terhadap video/replay; QR/manual tetap menjadi alternatif.</p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                                     <button type="button" id="face-auto-start" onclick="faceStartAutoScan()" class="bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 px-3 rounded-xl">
                                         <i class="fas fa-expand mr-2"></i>Mulai Smart Face (Uji Coba)
@@ -4973,6 +4973,7 @@ function biometricDemoDelete(id) {
     let faceAutoCandidateId = '';
     let faceAutoCandidateFrames = [];
     let faceAutoLastRecordedId = '';
+    let faceLivenessChallenge = null;
     let faceLastVoiceState = '';
 
     // Notifikasi suara khusus biometrik; mengikuti tombol suara aplikasi.
@@ -5114,6 +5115,65 @@ function biometricDemoDelete(id) {
             faceBusy = false;
         }
     };
+    // Pemeriksaan keaktifan dasar berbasis landmark: kedip lalu gerakkan kepala.
+    // Ini meningkatkan hambatan terhadap foto diam, tetapi bukan anti-spoofing tingkat tinggi.
+    function faceEyeAspectRatio(points) {
+        if (!points || points.length < 6) return 1;
+        const d = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+        const vertical = d(points[1],points[5]) + d(points[2],points[4]);
+        const horizontal = 2 * d(points[0],points[3]);
+        return horizontal ? vertical / horizontal : 1;
+    }
+    function faceReadLiveness(landmarks) {
+        const positions = landmarks && landmarks.positions;
+        if (!positions || positions.length < 68) return null;
+        const leftEye = positions.slice(36,42);
+        const rightEye = positions.slice(42,48);
+        const ear = (faceEyeAspectRatio(leftEye) + faceEyeAspectRatio(rightEye)) / 2;
+        const eyeLeft = positions[36], eyeRight = positions[45], nose = positions[30];
+        const span = eyeRight.x - eyeLeft.x;
+        const noseRatio = span ? (nose.x - eyeLeft.x) / span : 0.5;
+        return { ear, noseRatio };
+    }
+    function faceBeginLivenessChallenge() {
+        const direction = Math.random() < 0.5 ? 'kiri' : 'kanan';
+        faceLivenessChallenge = { step: 'blink', blinkClosed: false, direction, startedAt: Date.now() };
+        faceStatus('face-verify-status', 'Identitas cocok. Pemeriksaan keaktifan: KEDIPKAN MATA, lalu gerakkan kepala ke ' + direction.toUpperCase() + ' layar.', false);
+        faceSpeak('Silakan kedipkan mata, lalu gerakkan kepala ke ' + direction + ' layar.');
+    }
+    function faceAdvanceLiveness(landmarks) {
+        if (!faceLivenessChallenge) return false;
+        const metrics = faceReadLiveness(landmarks);
+        if (!metrics) return false;
+        const challenge = faceLivenessChallenge;
+        if (Date.now() - challenge.startedAt > 15000) {
+            faceLivenessChallenge = null;
+            faceAutoCandidateFrames = [];
+            faceAutoCandidateId = '';
+            faceStatus('face-verify-status', 'Pemeriksaan keaktifan melewati batas waktu. Silakan mulai pemindaian lagi.', true);
+            return false;
+        }
+        if (challenge.step === 'blink') {
+            if (metrics.ear < 0.20) challenge.blinkClosed = true;
+            if (challenge.blinkClosed && metrics.ear > 0.245) {
+                challenge.step = 'turn';
+                faceStatus('face-verify-status', 'Kedipan terdeteksi. Sekarang gerakkan kepala ke ' + challenge.direction.toUpperCase() + ' layar.', false);
+                faceSpeak('Bagus. Sekarang gerakkan kepala ke ' + challenge.direction + ' layar.');
+            } else {
+                faceStatus('face-verify-status', 'Pemeriksaan keaktifan: silakan KEDIPKAN MATA.', false);
+            }
+            return false;
+        }
+        const turned = challenge.direction === 'kiri' ? metrics.noseRatio < 0.425 : metrics.noseRatio > 0.575;
+        if (turned) {
+            faceLivenessChallenge = null;
+            faceStatus('face-verify-status', 'Pemeriksaan keaktifan dasar berhasil. Menyiapkan pencatatan absensi…', false);
+            return true;
+        }
+        faceStatus('face-verify-status', 'Kedipan terdeteksi. Gerakkan kepala sedikit ke ' + challenge.direction.toUpperCase() + ' layar.', false);
+        return false;
+    }
+
     window.faceStartAutoScan = async function () {
         if (!faceModelsReady) {
             faceStatus('face-verify-status', 'Muat model wajah terlebih dahulu.', true);
@@ -5130,17 +5190,19 @@ function biometricDemoDelete(id) {
         faceAutoCandidateId = '';
         faceAutoCandidateFrames = [];
         faceAutoLastRecordedId = '';
+        faceLivenessChallenge = null;
         faceEl('face-attendance-button').disabled = true;
         faceAutoScanActive = true;
         faceEl('face-auto-start').disabled = true;
         faceEl('face-auto-stop').disabled = false;
-        faceStatus('face-verify-status', 'SMART FACE PILOT aktif. Tiga frame konsisten akan memicu pencatatan otomatis. Peringatan: belum ada liveness detection; foto/video masih berisiko. Gunakan uji coba terbatas.', false);
+        faceStatus('face-verify-status', 'SMART FACE PILOT aktif. Setelah tiga frame konsisten, ikuti tantangan kedip dan gerak kepala. Ini pemeriksaan keaktifan dasar, bukan jaminan anti-spoofing.', false);
         faceAutoScanTick();
     };
 
     window.faceStopAutoScan = function () {
         faceAutoScanActive = false;
         faceAutoScanInFlight = false;
+        faceLivenessChallenge = null;
         if (faceAutoScanTimer) {
             clearTimeout(faceAutoScanTimer);
             faceAutoScanTimer = null;
@@ -5161,7 +5223,7 @@ function biometricDemoDelete(id) {
                 .withFaceLandmarks().withFaceDescriptors();
             if (!faceAutoScanActive) return;
             if (detections.length > 1) {
-                faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
+                faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null;
                 faceStatus('face-verify-status', 'Terdeteksi lebih dari satu wajah. Pastikan hanya satu siswa di depan kamera.', true);
             } else if (detections.length === 1) {
                 const descriptor = Array.from(detections[0].descriptor);
@@ -5175,7 +5237,16 @@ function biometricDemoDelete(id) {
                         faceStatus('face-verify-status', (result.student.nama || 'Siswa') + ' sudah diproses hari ini. Menunggu siswa berikutnya…', false);
                         return;
                     }
-                    if (candidateId !== faceAutoCandidateId) { faceAutoCandidateId = candidateId; faceAutoCandidateFrames = []; }
+                    if (candidateId !== faceAutoCandidateId) { faceAutoCandidateId = candidateId; faceAutoCandidateFrames = []; faceLivenessChallenge = null; }
+                    if (faceLivenessChallenge) {
+                        const passed = faceAdvanceLiveness(detections[0].landmarks);
+                        if (!passed) return;
+                    }
+                    if (!faceLivenessChallenge && faceAutoCandidateFrames.length >= 3) {
+                        // Tantangan dibuat setelah identitas stabil; jangan rekam sebelum tantangan selesai.
+                        faceBeginLivenessChallenge();
+                        return;
+                    }
                     faceAutoCandidateFrames.push(descriptor);
                     if (faceAutoCandidateFrames.length > 3) faceAutoCandidateFrames.shift();
                     faceStatus('face-verify-status', 'Kandidat: ' + (result.student.nama || '-') + ' (' + (result.student.kelas || '-') + '). Konsistensi frame ' + faceAutoCandidateFrames.length + '/3. Jarak: ' + result.distance + '. Menunggu hasil stabil…', false);
@@ -5188,7 +5259,7 @@ function biometricDemoDelete(id) {
                         if (saved.attendance_written) {
                             faceAutoLastRecordedId = candidateId;
                             faceSpeak('Absensi berhasil. ' + (saved.student && saved.student.nama || result.student.nama), 'auto:' + candidateId + ':' + date);
-                            faceStatus('face-verify-status', 'ABSENSI BERHASIL TERCATAT OTOMATIS.\nNama: ' + (saved.student && saved.student.nama || result.student.nama) + '\nKelas: ' + (saved.student && saved.student.kelas || result.student.kelas) + '\nJam: ' + time + '\nStatus: ' + (saved.status_kehadiran || 'Tercatat') + '\nCatatan: mode uji coba belum memiliki liveness detection.', false);
+                            faceStatus('face-verify-status', 'ABSENSI BERHASIL TERCATAT OTOMATIS.\nNama: ' + (saved.student && saved.student.nama || result.student.nama) + '\nKelas: ' + (saved.student && saved.student.kelas || result.student.kelas) + '\nJam: ' + time + '\nStatus: ' + (saved.status_kehadiran || 'Tercatat') + '\nCatatan: pemeriksaan keaktifan dasar berhasil; belum menjamin anti-spoofing penuh.', false);
                             faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
                             await new Promise(resolve => setTimeout(resolve, 1800));
                         } else if (saved.duplicate) {
@@ -5207,11 +5278,11 @@ function biometricDemoDelete(id) {
                         }
                     }
                 } else {
-                    faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
+                    faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null;
                     faceStatus('face-verify-status', result.message || 'Wajah belum cocok. Posisikan wajah dengan cahaya cukup.', true);
                 }
             } else {
-                faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
+                faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null;
                 faceAutoLastRecordedId = '';
                 faceLastVoiceState = '';
                 faceStatus('face-verify-status', 'Mencari wajah… Pastikan hanya satu wajah terlihat jelas di kamera.', false);
@@ -5220,7 +5291,7 @@ function biometricDemoDelete(id) {
             if (faceAutoScanActive) faceStatus('face-verify-status', 'Smart Face pilot: ' + err.message, true);
         } finally {
             faceAutoScanInFlight = false;
-            if (faceAutoScanActive) faceAutoScanTimer = setTimeout(faceAutoScanTick, 900);
+            if (faceAutoScanActive) faceAutoScanTimer = setTimeout(faceAutoScanTick, faceLivenessChallenge ? 450 : 900);
         }
     }
 
