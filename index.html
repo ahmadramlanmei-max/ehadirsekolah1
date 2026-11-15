@@ -5169,6 +5169,12 @@ function biometricDemoDelete(id) {
                 if (!faceAutoScanActive) return;
                 if (result.match && result.student) {
                     const candidateId = String(result.student.id);
+                    // Hindari mengirim permintaan berulang ketika siswa yang sama masih di depan kamera.
+                    if (candidateId === faceAutoLastRecordedId) {
+                        faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
+                        faceStatus('face-verify-status', (result.student.nama || 'Siswa') + ' sudah diproses hari ini. Menunggu siswa berikutnya…', false);
+                        return;
+                    }
                     if (candidateId !== faceAutoCandidateId) { faceAutoCandidateId = candidateId; faceAutoCandidateFrames = []; }
                     faceAutoCandidateFrames.push(descriptor);
                     if (faceAutoCandidateFrames.length > 3) faceAutoCandidateFrames.shift();
@@ -5184,7 +5190,16 @@ function biometricDemoDelete(id) {
                             faceSpeak('Absensi berhasil. ' + (saved.student && saved.student.nama || result.student.nama), 'auto:' + candidateId + ':' + date);
                             faceStatus('face-verify-status', 'ABSENSI BERHASIL TERCATAT OTOMATIS.\nNama: ' + (saved.student && saved.student.nama || result.student.nama) + '\nKelas: ' + (saved.student && saved.student.kelas || result.student.kelas) + '\nJam: ' + time + '\nStatus: ' + (saved.status_kehadiran || 'Tercatat') + '\nCatatan: mode uji coba belum memiliki liveness detection.', false);
                             faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
-                            await new Promise(resolve => setTimeout(resolve, 2200));
+                            await new Promise(resolve => setTimeout(resolve, 1800));
+                        } else if (saved.duplicate) {
+                            faceAutoLastRecordedId = candidateId;
+                            const nama = (saved.student && saved.student.nama) || result.student.nama || 'Siswa';
+                            const jam = saved.existing_time ? ' pukul ' + saved.existing_time : '';
+                            const statusLama = saved.existing_status ? ' (' + saved.existing_status + ')' : '';
+                            faceSpeak(nama + ' sudah melakukan absensi hari ini.', 'duplicate:' + candidateId + ':' + date);
+                            faceStatus('face-verify-status', 'SUDAH ABSEN HARI INI.\nNama: ' + nama + '\nKelas: ' + ((saved.student && saved.student.kelas) || result.student.kelas || '-') + '\nWaktu absensi: ' + (saved.existing_time || 'sudah tercatat') + statusLama + '\nAbsensi tidak dicatat ulang. Menunggu siswa berikutnya…', false);
+                            faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
+                            await new Promise(resolve => setTimeout(resolve, 1800));
                         } else {
                             faceStatus('face-verify-status', saved.message || 'Server belum mengonfirmasi absensi. Gunakan QR/manual.', true);
                             faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
@@ -5197,6 +5212,7 @@ function biometricDemoDelete(id) {
                 }
             } else {
                 faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
+                faceAutoLastRecordedId = '';
                 faceLastVoiceState = '';
                 faceStatus('face-verify-status', 'Mencari wajah… Pastikan hanya satu wajah terlihat jelas di kamera.', false);
             }
