@@ -1173,6 +1173,26 @@
                                     <i class="fas fa-calendar-check mr-2"></i>Konfirmasi dan Catat Hadir
                                 </button>
                                 <div id="face-verify-status" role="status" class="text-sm text-slate-600 bg-slate-50 rounded-xl p-3 mt-3">Belum ada verifikasi.</div>
+                                <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div class="flex items-center justify-between gap-2 mb-3">
+                                        <h4 class="font-extrabold text-slate-800"><i class="fas fa-gauge-high text-blue-600 mr-2"></i>Monitoring Smart Face</h4>
+                                        <span id="face-monitor-state" class="text-xs font-bold rounded-full px-3 py-1 bg-slate-200 text-slate-600">BELUM AKTIF</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <div class="bg-white rounded-xl p-3 border border-slate-100"><div class="text-xs text-slate-500">Berhasil</div><div id="face-monitor-success" class="text-2xl font-extrabold text-emerald-600">0</div></div>
+                                        <div class="bg-white rounded-xl p-3 border border-slate-100"><div class="text-xs text-slate-500">Sudah absen</div><div id="face-monitor-duplicate" class="text-2xl font-extrabold text-blue-600">0</div></div>
+                                        <div class="bg-white rounded-xl p-3 border border-slate-100"><div class="text-xs text-slate-500">Gagal cocok</div><div id="face-monitor-failed" class="text-2xl font-extrabold text-rose-600">0</div></div>
+                                        <div class="bg-white rounded-xl p-3 border border-slate-100"><div class="text-xs text-slate-500">Rata-rata proses</div><div id="face-monitor-average" class="text-2xl font-extrabold text-slate-800">—</div></div>
+                                    </div>
+                                    <div class="flex flex-wrap justify-between gap-2 mt-3 text-xs text-slate-600">
+                                        <span id="face-monitor-camera">Kamera: belum siap</span>
+                                        <span id="face-monitor-last">Pemindaian terakhir: —</span>
+                                    </div>
+                                    <div id="face-monitor-queue" class="mt-2 text-sm font-semibold text-slate-700">Siap menerima siswa.</div>
+                                    <div class="flex justify-end mt-3">
+                                        <button type="button" onclick="faceResetMonitor()" class="text-xs font-bold text-slate-500 hover:text-slate-800 px-3 py-2 rounded-lg border border-slate-200 bg-white">Reset statistik sesi</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -4979,6 +4999,46 @@ function biometricDemoDelete(id) {
     let faceAutoCandidateFrames = [];
     let faceAutoLastRecordedId = '';
     let faceAutoWaitForFaceExit = false;
+    const faceMonitor = { success: 0, duplicate: 0, failed: 0, durations: [], lastAt: null, state: 'idle' };
+    function faceMonitorRender() {
+        const set = (id, value) => { const el = faceEl(id); if (el) el.textContent = value; };
+        set('face-monitor-success', faceMonitor.success);
+        set('face-monitor-duplicate', faceMonitor.duplicate);
+        set('face-monitor-failed', faceMonitor.failed);
+        const avg = faceMonitor.durations.length
+            ? Math.round(faceMonitor.durations.reduce((a,b)=>a+b,0) / faceMonitor.durations.length) + ' ms'
+            : '—';
+        set('face-monitor-average', avg);
+        set('face-monitor-state', faceMonitor.state === 'active' ? 'MEMINDAI' : faceMonitor.state === 'processing' ? 'MEMERIKSA' : 'BERHENTI');
+        const stateEl = faceEl('face-monitor-state');
+        if (stateEl) stateEl.className = 'text-xs font-bold rounded-full px-3 py-1 ' +
+            (faceMonitor.state === 'active' ? 'bg-emerald-100 text-emerald-700' :
+             faceMonitor.state === 'processing' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600');
+        set('face-monitor-last', 'Pemindaian terakhir: ' + (faceMonitor.lastAt || '—'));
+        const video = faceEl('face-video');
+        set('face-monitor-camera', 'Kamera: ' + (video && video.srcObject && video.readyState >= 2 ? 'siap' : 'belum siap'));
+    }
+    function faceMonitorEvent(kind, duration, message) {
+        if (kind === 'success') faceMonitor.success++;
+        else if (kind === 'duplicate') faceMonitor.duplicate++;
+        else if (kind === 'failed') faceMonitor.failed++;
+        if (Number.isFinite(duration) && duration >= 0) {
+            faceMonitor.durations.push(duration);
+            if (faceMonitor.durations.length > 30) faceMonitor.durations.shift();
+        }
+        faceMonitor.lastAt = new Date().toLocaleTimeString('id-ID');
+        const q = faceEl('face-monitor-queue');
+        if (q) q.textContent = message || 'Menunggu siswa berikutnya…';
+        faceMonitorRender();
+    }
+    window.faceResetMonitor = function () {
+        faceMonitor.success = 0; faceMonitor.duplicate = 0; faceMonitor.failed = 0;
+        faceMonitor.durations = []; faceMonitor.lastAt = null;
+        faceMonitorRender();
+        const q = faceEl('face-monitor-queue');
+        if (q) q.textContent = 'Statistik sesi direset. Siap menerima siswa.';
+    };
+    setTimeout(faceMonitorRender, 0);
     let faceLivenessChallenge = null;
     let faceLivenessPassed = false;
     let faceLastVoiceState = '';
@@ -5175,6 +5235,7 @@ function biometricDemoDelete(id) {
 
     window.faceStopAutoScan = function () {
         faceAutoScanActive = false;
+        faceMonitor.state = 'idle'; faceMonitorRender();
         faceAutoScanInFlight = false;
         faceLivenessChallenge = null;
         faceLivenessPassed = false;
@@ -5276,11 +5337,15 @@ function biometricDemoDelete(id) {
                 const tx = 'SF' + Date.now().toString(36) +
                     Math.random().toString(36).slice(2,10);
 
+                faceMonitor.state = 'processing'; faceMonitorRender();
                 faceStatus('face-verify-status',
                     'Memeriksa tiga sampel wajah…', false);
+                const requestStartedAt = performance.now();
                 const saved = await faceApiCall(
                     'apiFaceAutoAttendance', [faceAutoCandidateFrames.slice(), date, time, tx]
                 );
+                const requestDuration = performance.now() - requestStartedAt;
+                faceMonitor.state = 'active';
 
                 if (!faceAutoScanActive) return;
 
@@ -5296,6 +5361,7 @@ function biometricDemoDelete(id) {
                         '\\nStatus: ' + (saved.status_kehadiran || 'Tercatat'), false);
                     faceAutoCandidateFrames = [];
                     faceAutoWaitForFaceExit = true;
+                    faceMonitorEvent('success', requestDuration, 'Presensi berhasil. Menunggu siswa berikutnya…');
                     await new Promise(resolve => setTimeout(resolve, 500));
                 } else if (saved.duplicate) {
                     const student = saved.student || {};
@@ -5310,8 +5376,10 @@ function biometricDemoDelete(id) {
                         '\\nAbsensi tidak dicatat ulang. Menunggu siswa berikutnya…', false);
                     faceAutoCandidateFrames = [];
                     faceAutoWaitForFaceExit = true;
+                    faceMonitorEvent('duplicate', requestDuration, 'Siswa sudah absen. Menunggu siswa berikutnya…');
                     await new Promise(resolve => setTimeout(resolve, 500));
                 } else {
+                    faceMonitorEvent('failed', requestDuration, 'Verifikasi gagal. Silakan atur ulang posisi wajah.');
                     faceStatus('face-verify-status',
                         saved.message || 'Wajah belum cocok. Posisikan wajah di dalam garis fokus.', true);
                     faceAutoCandidateFrames = [];
@@ -5326,7 +5394,11 @@ function biometricDemoDelete(id) {
                     'Arahkan satu wajah ke dalam garis fokus kamera. Sistem sedang mencari wajah…', false);
             }
         } catch (err) {
-            if (faceAutoScanActive) faceStatus('face-verify-status', 'Smart Face: ' + err.message, true);
+            if (faceAutoScanActive) {
+                faceMonitor.state = 'active';
+                faceMonitorEvent('failed', null, 'Gangguan pemindaian: ' + err.message);
+                faceStatus('face-verify-status', 'Smart Face: ' + err.message, true);
+            }
         } finally {
             faceAutoScanInFlight = false;
             if (faceAutoScanActive) faceAutoScanTimer = setTimeout(faceAutoScanTick, 300);
