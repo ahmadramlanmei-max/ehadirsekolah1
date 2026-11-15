@@ -5136,11 +5136,16 @@ function biometricDemoDelete(id) {
         const noseRatio = span ? (nose.x - eyeLeft.x) / span : 0.5;
         return { ear, noseRatio };
     }
-    function faceBeginLivenessChallenge() {
+    function faceBeginLivenessChallenge(landmarks) {
         const direction = Math.random() < 0.5 ? 'kiri' : 'kanan';
         const secondDirection = direction === 'kiri' ? 'kanan' : 'kiri';
+        const baseline = faceReadLiveness(landmarks) || { ear: 0.27, noseRatio: 0.5 };
         faceLivenessPassed = false;
-        faceLivenessChallenge = { step: 'blink', blinkClosed: false, direction, secondDirection, startedAt: Date.now() };
+        faceLivenessChallenge = {
+            step: 'blink', blinkClosed: false, direction, secondDirection,
+            startedAt: Date.now(), baselineEar: baseline.ear,
+            baselineNoseRatio: baseline.noseRatio
+        };
         faceStatus('face-verify-status', 'Identitas cocok. Tantangan: KEDIPKAN MATA, gerakkan kepala ke ' + direction.toUpperCase() + ', lalu ke ' + secondDirection.toUpperCase() + '.', false);
         faceSpeak('Silakan kedipkan mata, lalu gerakkan kepala ke ' + direction + ' dan kemudian ke ' + secondDirection + ' layar.');
     }
@@ -5149,7 +5154,7 @@ function biometricDemoDelete(id) {
         const metrics = faceReadLiveness(landmarks);
         if (!metrics) return false;
         const challenge = faceLivenessChallenge;
-        if (Date.now() - challenge.startedAt > 15000) {
+        if (Date.now() - challenge.startedAt > 25000) {
             faceLivenessChallenge = null;
             faceLivenessPassed = false;
             faceAutoCandidateFrames = [];
@@ -5158,8 +5163,10 @@ function biometricDemoDelete(id) {
             return false;
         }
         if (challenge.step === 'blink') {
-            if (metrics.ear < 0.20) challenge.blinkClosed = true;
-            if (challenge.blinkClosed && metrics.ear > 0.245) {
+            const closedThreshold = Math.max(0.10, challenge.baselineEar * 0.74);
+            const openThreshold = Math.max(0.16, challenge.baselineEar * 0.88);
+            if (metrics.ear < closedThreshold) challenge.blinkClosed = true;
+            if (challenge.blinkClosed && metrics.ear > openThreshold) {
                 challenge.step = 'turn1';
                 faceStatus('face-verify-status', 'Kedipan terdeteksi. Gerakkan kepala ke ' + challenge.direction.toUpperCase() + ', lalu ke ' + challenge.secondDirection.toUpperCase() + '.', false);
                 faceSpeak('Bagus. Sekarang gerakkan kepala ke ' + challenge.direction + ' layar.');
@@ -5168,8 +5175,12 @@ function biometricDemoDelete(id) {
             }
             return false;
         }
-        const turnedFirst = challenge.direction === 'kiri' ? metrics.noseRatio < 0.425 : metrics.noseRatio > 0.575;
-        const turnedSecond = challenge.secondDirection === 'kiri' ? metrics.noseRatio < 0.425 : metrics.noseRatio > 0.575;
+        const turnDelta = metrics.noseRatio - challenge.baselineNoseRatio;
+        // Deteksi gerakan relatif terhadap posisi netral pengguna, bukan ambang posisi absolut.
+        const turnedLeft = turnDelta < -0.045;
+        const turnedRight = turnDelta > 0.045;
+        const turnedFirst = challenge.direction === 'kiri' ? turnedLeft : turnedRight;
+        const turnedSecond = challenge.secondDirection === 'kiri' ? turnedLeft : turnedRight;
         if (challenge.step === 'turn1' && turnedFirst) {
             challenge.step = 'turn2';
             faceStatus('face-verify-status', 'Gerakan pertama terdeteksi. Sekarang gerakkan kepala ke ' + challenge.secondDirection.toUpperCase() + ' layar.', false);
@@ -5259,7 +5270,7 @@ function biometricDemoDelete(id) {
                     }
                     if (!faceLivenessPassed && !faceLivenessChallenge && faceAutoCandidateFrames.length >= 3) {
                         // Identitas sudah stabil; tantangan harus selesai sebelum absensi dikirim.
-                        faceBeginLivenessChallenge();
+                        faceBeginLivenessChallenge(detections[0].landmarks);
                         return;
                     }
                     if (!faceLivenessPassed) {
