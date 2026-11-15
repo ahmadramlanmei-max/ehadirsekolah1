@@ -1106,7 +1106,7 @@
                             <i class="fas fa-shield-halved text-xl mt-1"></i>
                             <div>
                                 <h2 class="font-extrabold text-lg">Biometrik Wajah — Uji Terbatas</h2>
-                                <p class="text-sm mt-1">Model ini membuat descriptor wajah di browser dan mengirimkan descriptor, bukan foto, untuk penyimpanan terenkripsi. Sistem belum memiliki deteksi keaktifan (liveness), sehingga foto atau layar dapat menipu sistem. Gunakan hanya dengan izin yang sesuai dan konfirmasi identitas secara langsung.</p>
+                                <p class="text-sm mt-1">Model membuat descriptor wajah di browser dan mengirimkan descriptor, bukan foto, untuk penyimpanan terenkripsi. Mode sederhana ini tidak menggunakan pemeriksaan keaktifan; foto atau video dapat berisiko disalahgunakan. Gunakan dalam pengawasan petugas dan sediakan alternatif QR/manual.</p>
                             </div>
                         </div>
                     </div>
@@ -1122,8 +1122,13 @@
                                     <i class="fas fa-cube mr-2"></i>Muat Model Wajah
                                 </button>
                             </div>
-                            <div class="bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center min-h-[220px]">
+                            <div class="bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center min-h-[220px] relative" id="face-camera-frame">
                                 <video id="face-video" class="w-full max-h-[420px] object-cover" autoplay muted playsinline></video>
+                                <div id="face-focus-guide" aria-hidden="true" class="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                    <div class="w-[62%] h-[78%] max-w-[300px] rounded-[48%] border-[3px] border-emerald-400 shadow-[0_0_0_999px_rgba(2,6,23,0.20)] relative">
+                                        <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-wider">POSISIKAN WAJAH DI SINI</span>
+                                    </div>
+                                </div>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                                 <button type="button" id="face-start-camera" onclick="faceStartCamera()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl">
@@ -1152,7 +1157,7 @@
 
                             <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 md:p-6">
                                 <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-user-check text-blue-600 mr-2"></i>Verifikasi dan Absensi</h3>
-                                <p class="text-sm text-slate-500 mt-1">Mode uji coba: setelah tiga frame cocok, siswa diminta berkedip dan menggerakkan kepala ke dua arah berlawanan dalam urutan acak. Pemeriksaan ini hanya liveness dasar, belum menjamin anti-spoofing terhadap video/replay; QR/manual tetap menjadi alternatif.</p>
+                                <p class="text-sm text-slate-500 mt-1">Arahkan wajah ke garis fokus kamera. Sistem akan mencocokkan wajah dalam tiga frame stabil, lalu mencatat presensi otomatis. QR/manual tetap tersedia sebagai alternatif.</p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                                     <button type="button" id="face-auto-start" onclick="faceStartAutoScan()" class="bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 px-3 rounded-xl">
                                         <i class="fas fa-expand mr-2"></i>Mulai Smart Face (Uji Coba)
@@ -5136,67 +5141,10 @@ function biometricDemoDelete(id) {
         const noseRatio = span ? (nose.x - eyeLeft.x) / span : 0.5;
         return { ear, noseRatio };
     }
-    function faceBeginLivenessChallenge(landmarks) {
-        const direction = Math.random() < 0.5 ? 'kiri' : 'kanan';
-        const secondDirection = direction === 'kiri' ? 'kanan' : 'kiri';
-        const baseline = faceReadLiveness(landmarks) || { ear: 0.27, noseRatio: 0.5 };
-        faceLivenessPassed = false;
-        faceLivenessChallenge = {
-            step: 'blink', blinkClosed: false, direction, secondDirection,
-            startedAt: Date.now(), baselineEar: baseline.ear,
-            baselineNoseRatio: baseline.noseRatio
-        };
-        faceStatus('face-verify-status', 'Identitas cocok. Tantangan: KEDIPKAN MATA, gerakkan kepala ke ' + direction.toUpperCase() + ', lalu ke ' + secondDirection.toUpperCase() + '.', false);
-        faceSpeak('Silakan kedipkan mata, lalu gerakkan kepala ke ' + direction + ' dan kemudian ke ' + secondDirection + ' layar.');
-    }
-    function faceAdvanceLiveness(landmarks) {
-        if (!faceLivenessChallenge) return false;
-        const metrics = faceReadLiveness(landmarks);
-        if (!metrics) return false;
-        const challenge = faceLivenessChallenge;
-        if (Date.now() - challenge.startedAt > 25000) {
-            faceLivenessChallenge = null;
-            faceLivenessPassed = false;
-            faceAutoCandidateFrames = [];
-            faceAutoCandidateId = '';
-            faceStatus('face-verify-status', 'Pemeriksaan keaktifan melewati batas waktu. Silakan mulai pemindaian lagi.', true);
-            return false;
-        }
-        if (challenge.step === 'blink') {
-            const closedThreshold = Math.max(0.10, challenge.baselineEar * 0.74);
-            const openThreshold = Math.max(0.16, challenge.baselineEar * 0.88);
-            if (metrics.ear < closedThreshold) challenge.blinkClosed = true;
-            if (challenge.blinkClosed && metrics.ear > openThreshold) {
-                challenge.step = 'turn1';
-                faceStatus('face-verify-status', 'Kedipan terdeteksi. Gerakkan kepala ke ' + challenge.direction.toUpperCase() + ', lalu ke ' + challenge.secondDirection.toUpperCase() + '.', false);
-                faceSpeak('Bagus. Sekarang gerakkan kepala ke ' + challenge.direction + ' layar.');
-            } else {
-                faceStatus('face-verify-status', 'Pemeriksaan keaktifan: silakan KEDIPKAN MATA.', false);
-            }
-            return false;
-        }
-        const turnDelta = metrics.noseRatio - challenge.baselineNoseRatio;
-        // Deteksi gerakan relatif terhadap posisi netral pengguna, bukan ambang posisi absolut.
-        const turnedLeft = turnDelta < -0.045;
-        const turnedRight = turnDelta > 0.045;
-        const turnedFirst = challenge.direction === 'kiri' ? turnedLeft : turnedRight;
-        const turnedSecond = challenge.secondDirection === 'kiri' ? turnedLeft : turnedRight;
-        if (challenge.step === 'turn1' && turnedFirst) {
-            challenge.step = 'turn2';
-            faceStatus('face-verify-status', 'Gerakan pertama terdeteksi. Sekarang gerakkan kepala ke ' + challenge.secondDirection.toUpperCase() + ' layar.', false);
-            faceSpeak('Sekarang gerakkan kepala ke ' + challenge.secondDirection + ' layar.');
-            return false;
-        }
-        if (challenge.step === 'turn2' && turnedSecond) {
-            faceLivenessChallenge = null;
-            faceLivenessPassed = true;
-            faceStatus('face-verify-status', 'Tantangan gerak berhasil. Menyiapkan pencatatan absensi…', false);
-            return true;
-        }
-        const target = challenge.step === 'turn1' ? challenge.direction : challenge.secondDirection;
-        faceStatus('face-verify-status', 'Gerakkan kepala sedikit ke ' + target.toUpperCase() + ' layar.', false);
-        return false;
-    }
+    // Mode sederhana: tidak menggunakan tantangan kedip/gerak kepala.
+    // Kecocokan tetap memerlukan tiga frame stabil dan server tetap mencegah presensi ganda.
+    function faceBeginLivenessChallenge() { faceLivenessChallenge = null; faceLivenessPassed = true; }
+    function faceAdvanceLiveness() { faceLivenessChallenge = null; faceLivenessPassed = true; return true; }
 
     window.faceStartAutoScan = async function () {
         if (!faceModelsReady) {
@@ -5220,7 +5168,7 @@ function biometricDemoDelete(id) {
         faceAutoScanActive = true;
         faceEl('face-auto-start').disabled = true;
         faceEl('face-auto-stop').disabled = false;
-        faceStatus('face-verify-status', 'SMART FACE PILOT aktif. Setelah tiga frame konsisten, ikuti tantangan kedip dan gerak kepala. Ini pemeriksaan keaktifan dasar, bukan jaminan anti-spoofing.', false);
+        faceStatus('face-verify-status', 'SMART FACE aktif. Posisikan satu wajah di dalam garis fokus kamera. Tahan posisi hingga wajah cocok dan presensi tercatat.', false);
         faceAutoScanTick();
     };
 
@@ -5264,21 +5212,11 @@ function biometricDemoDelete(id) {
                         return;
                     }
                     if (candidateId !== faceAutoCandidateId) { faceAutoCandidateId = candidateId; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false; }
-                    if (faceLivenessChallenge) {
-                        const passed = faceAdvanceLiveness(detections[0].landmarks);
-                        if (!passed) return;
-                    }
-                    if (!faceLivenessPassed && !faceLivenessChallenge && faceAutoCandidateFrames.length >= 3) {
-                        // Identitas sudah stabil; tantangan harus selesai sebelum absensi dikirim.
-                        faceBeginLivenessChallenge(detections[0].landmarks);
-                        return;
-                    }
-                    if (!faceLivenessPassed) {
-                        faceAutoCandidateFrames.push(descriptor);
-                        if (faceAutoCandidateFrames.length > 3) faceAutoCandidateFrames.shift();
-                        faceStatus('face-verify-status', 'Kandidat: ' + (result.student.nama || '-') + ' (' + (result.student.kelas || '-') + '). Konsistensi frame ' + faceAutoCandidateFrames.length + '/3. Jarak: ' + result.distance + '. Menunggu hasil stabil…', false);
-                        return;
-                    }
+                    faceAutoCandidateFrames.push(descriptor);
+                    if (faceAutoCandidateFrames.length > 3) faceAutoCandidateFrames.shift();
+                    faceStatus('face-verify-status', 'Wajah terdeteksi: ' + (result.student.nama || '-') + ' (' + (result.student.kelas || '-') + '). Kecocokan stabil ' + faceAutoCandidateFrames.length + '/3. Jarak: ' + result.distance + '. Tahan wajah di dalam garis fokus…', false);
+                    if (faceAutoCandidateFrames.length < 3) return;
+                    faceLivenessPassed = true;
                     // Tantangan liveness selesai: kirim tiga descriptor stabil ke endpoint absensi.
                     if (faceLivenessPassed && faceAutoCandidateFrames.length === 3) {
                         const now = new Date();
@@ -5289,7 +5227,7 @@ function biometricDemoDelete(id) {
                         if (saved.attendance_written) {
                             faceAutoLastRecordedId = candidateId;
                             faceSpeak('Absensi berhasil. ' + (saved.student && saved.student.nama || result.student.nama), 'auto:' + candidateId + ':' + date);
-                            faceStatus('face-verify-status', 'ABSENSI BERHASIL TERCATAT OTOMATIS.\nNama: ' + (saved.student && saved.student.nama || result.student.nama) + '\nKelas: ' + (saved.student && saved.student.kelas || result.student.kelas) + '\nJam: ' + time + '\nStatus: ' + (saved.status_kehadiran || 'Tercatat') + '\nCatatan: pemeriksaan keaktifan dasar berhasil; belum menjamin anti-spoofing penuh.', false);
+                            faceStatus('face-verify-status', 'WAJAH COCOK — PRESENSI BERHASIL.\nNama: ' + (saved.student && saved.student.nama || result.student.nama) + '\nKelas: ' + (saved.student && saved.student.kelas || result.student.kelas) + '\nJam: ' + time + '\nStatus: ' + (saved.status_kehadiran || 'Tercatat'), false);
                             faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessPassed = false;
                             await new Promise(resolve => setTimeout(resolve, 1800));
                         } else if (saved.duplicate) {
@@ -5309,13 +5247,13 @@ function biometricDemoDelete(id) {
                     }
                 } else {
                     faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false;
-                    faceStatus('face-verify-status', result.message || 'Wajah belum cocok. Posisikan wajah dengan cahaya cukup.', true);
+                    faceStatus('face-verify-status', result.message || 'Wajah belum cocok. Posisikan wajah tepat di dalam garis fokus dan pastikan pencahayaan cukup.', true);
                 }
             } else {
                 faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false;
                 faceAutoLastRecordedId = '';
                 faceLastVoiceState = '';
-                faceStatus('face-verify-status', 'Mencari wajah… Pastikan hanya satu wajah terlihat jelas di kamera.', false);
+                faceStatus('face-verify-status', 'Arahkan satu wajah ke dalam garis fokus kamera. Sistem sedang mencari wajah…', false);
             }
         } catch (err) {
             if (faceAutoScanActive) faceStatus('face-verify-status', 'Smart Face pilot: ' + err.message, true);
