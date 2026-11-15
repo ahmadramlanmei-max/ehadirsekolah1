@@ -4978,6 +4978,7 @@ function biometricDemoDelete(id) {
     let faceAutoCandidateId = '';
     let faceAutoCandidateFrames = [];
     let faceAutoLastRecordedId = '';
+    let faceAutoWaitForFaceExit = false;
     let faceLivenessChallenge = null;
     let faceLivenessPassed = false;
     let faceLastVoiceState = '';
@@ -5230,78 +5231,105 @@ function biometricDemoDelete(id) {
         faceAutoScanInFlight = true;
         try {
             const video = faceEl('face-video');
-            if (!faceModelsReady || !video || !video.srcObject || video.readyState < 2) throw new Error('Kamera tidak aktif atau model belum siap.');
-            const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({inputSize: 224, scoreThreshold: 0.60}))
-                .withFaceLandmarks().withFaceDescriptors();
+            if (!faceModelsReady || !video || !video.srcObject || video.readyState < 2) {
+                throw new Error('Kamera tidak aktif atau model belum siap.');
+            }
+
+            // Deteksi dan descriptor dilakukan lokal. Tidak ada request server per frame.
+            const detections = await faceapi.detectAllFaces(
+                video, new faceapi.TinyFaceDetectorOptions({inputSize: 224, scoreThreshold: 0.60})
+            ).withFaceLandmarks().withFaceDescriptors();
+
             if (!faceAutoScanActive) return;
+
             if (detections.length > 1) {
                 faceUpdateFocusGuide(video, null, 'search');
-                faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false;
-                faceStatus('face-verify-status', 'Terdeteksi lebih dari satu wajah. Pastikan hanya satu siswa di depan kamera.', true);
+                faceAutoCandidateFrames = [];
+                faceStatus('face-verify-status',
+                    'Terdeteksi lebih dari satu wajah. Pastikan hanya satu siswa di depan kamera.', true);
             } else if (detections.length === 1) {
-                faceUpdateFocusGuide(video, detections[0].detection.box, 'detected');
+                faceUpdateFocusGuide(video, detections[0].detection.box,
+                    faceAutoWaitForFaceExit ? 'matched' : 'detected');
+                if (faceAutoWaitForFaceExit) {
+                    faceStatus('face-verify-status',
+                        'Presensi siswa sudah diproses. Silakan siswa berikutnya bergantian di depan kamera.', false);
+                    return;
+                }
                 const descriptor = Array.from(detections[0].descriptor);
-                const result = await faceApiCall('apiFaceVerify', [descriptor]);
+                faceAutoCandidateFrames.push(descriptor);
+                if (faceAutoCandidateFrames.length > 3) faceAutoCandidateFrames.shift();
+
+                faceStatus('face-verify-status',
+                    'Wajah terdeteksi. Mengumpulkan sampel ' + faceAutoCandidateFrames.length +
+                    '/3. Tahan wajah di dalam garis fokus…', false);
+
+                if (faceAutoCandidateFrames.length < 3) return;
+
+                // Satu request untuk tiga descriptor, pencocokan dan absensi diproses dalam satu jalur.
+                const now = new Date();
+                const date = now.getFullYear() + '-' +
+                    String(now.getMonth()+1).padStart(2,'0') + '-' +
+                    String(now.getDate()).padStart(2,'0');
+                const time = String(now.getHours()).padStart(2,'0') + ':' +
+                    String(now.getMinutes()).padStart(2,'0') + ':' +
+                    String(now.getSeconds()).padStart(2,'0');
+                const tx = 'SF' + Date.now().toString(36) +
+                    Math.random().toString(36).slice(2,10);
+
+                faceStatus('face-verify-status',
+                    'Memeriksa tiga sampel wajah…', false);
+                const saved = await faceApiCall(
+                    'apiFaceAutoAttendance', [faceAutoCandidateFrames.slice(), date, time, tx]
+                );
+
                 if (!faceAutoScanActive) return;
-                if (result.match && result.student) {
+
+                if (saved.attendance_written) {
+                    const student = saved.student || {};
+                    faceAutoLastRecordedId = String(student.id || '');
                     faceUpdateFocusGuide(video, detections[0].detection.box, 'matched');
-                    const candidateId = String(result.student.id);
-                    // Hindari mengirim permintaan berulang ketika siswa yang sama masih di depan kamera.
-                    if (candidateId === faceAutoLastRecordedId) {
-                        faceAutoCandidateId = ''; faceAutoCandidateFrames = [];
-                        faceStatus('face-verify-status', (result.student.nama || 'Siswa') + ' sudah diproses hari ini. Menunggu siswa berikutnya…', false);
-                        return;
-                    }
-                    if (candidateId !== faceAutoCandidateId) { faceAutoCandidateId = candidateId; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false; }
-                    faceAutoCandidateFrames.push(descriptor);
-                    if (faceAutoCandidateFrames.length > 3) faceAutoCandidateFrames.shift();
-                    faceStatus('face-verify-status', 'Wajah terdeteksi: ' + (result.student.nama || '-') + ' (' + (result.student.kelas || '-') + '). Kecocokan stabil ' + faceAutoCandidateFrames.length + '/3. Jarak: ' + result.distance + '. Tahan wajah di dalam garis fokus…', false);
-                    if (faceAutoCandidateFrames.length < 3) return;
-                    faceLivenessPassed = true;
-                    // Tantangan liveness selesai: kirim tiga descriptor stabil ke endpoint absensi.
-                    if (faceLivenessPassed && faceAutoCandidateFrames.length === 3) {
-                        const now = new Date();
-                        const date = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-                        const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
-                        const tx = 'SF' + Date.now().toString(36) + Math.random().toString(36).slice(2,10);
-                        const saved = await faceApiCall('apiFaceAutoAttendance', [faceAutoCandidateFrames.slice(), date, time, tx]);
-                        if (saved.attendance_written) {
-                            faceAutoLastRecordedId = candidateId;
-                            faceSpeak('Absensi berhasil. ' + (saved.student && saved.student.nama || result.student.nama), 'auto:' + candidateId + ':' + date);
-                            faceStatus('face-verify-status', 'WAJAH COCOK — PRESENSI BERHASIL.\nNama: ' + (saved.student && saved.student.nama || result.student.nama) + '\nKelas: ' + (saved.student && saved.student.kelas || result.student.kelas) + '\nJam: ' + time + '\nStatus: ' + (saved.status_kehadiran || 'Tercatat'), false);
-                            faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessPassed = false;
-                            await new Promise(resolve => setTimeout(resolve, 1800));
-                        } else if (saved.duplicate) {
-                            faceAutoLastRecordedId = candidateId;
-                            const nama = (saved.student && saved.student.nama) || result.student.nama || 'Siswa';
-                            const jam = saved.existing_time ? ' pukul ' + saved.existing_time : '';
-                            const statusLama = saved.existing_status ? ' (' + saved.existing_status + ')' : '';
-                            faceSpeak(nama + ' sudah melakukan absensi hari ini.', 'duplicate:' + candidateId + ':' + date);
-                            faceStatus('face-verify-status', 'SUDAH ABSEN HARI INI.\nNama: ' + nama + '\nKelas: ' + ((saved.student && saved.student.kelas) || result.student.kelas || '-') + '\nWaktu absensi: ' + (saved.existing_time || 'sudah tercatat') + statusLama + '\nAbsensi tidak dicatat ulang. Menunggu siswa berikutnya…', false);
-                            faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessPassed = false;
-                            await new Promise(resolve => setTimeout(resolve, 1800));
-                        } else {
-                            faceStatus('face-verify-status', saved.message || 'Server belum mengonfirmasi absensi. Gunakan QR/manual.', true);
-                            faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessPassed = false;
-                            await new Promise(resolve => setTimeout(resolve, 1600));
-                        }
-                    }
+                    faceSpeak('Absensi berhasil. ' + (student.nama || 'Siswa'),
+                        'auto:' + faceAutoLastRecordedId + ':' + date);
+                    faceStatus('face-verify-status',
+                        'WAJAH COCOK — PRESENSI BERHASIL.\\nNama: ' + (student.nama || '-') +
+                        '\\nKelas: ' + (student.kelas || '-') + '\\nJam: ' + time +
+                        '\\nStatus: ' + (saved.status_kehadiran || 'Tercatat'), false);
+                    faceAutoCandidateFrames = [];
+                    faceAutoWaitForFaceExit = true;
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else if (saved.duplicate) {
+                    const student = saved.student || {};
+                    faceAutoLastRecordedId = String(student.id || '');
+                    const nama = student.nama || 'Siswa';
+                    faceSpeak(nama + ' sudah melakukan absensi hari ini.',
+                        'duplicate:' + faceAutoLastRecordedId + ':' + date);
+                    faceStatus('face-verify-status',
+                        'SUDAH ABSEN HARI INI.\\nNama: ' + nama +
+                        '\\nKelas: ' + (student.kelas || '-') +
+                        '\\nWaktu absensi: ' + (saved.existing_time || 'sudah tercatat') +
+                        '\\nAbsensi tidak dicatat ulang. Menunggu siswa berikutnya…', false);
+                    faceAutoCandidateFrames = [];
+                    faceAutoWaitForFaceExit = true;
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 } else {
-                    faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false;
-                    faceStatus('face-verify-status', result.message || 'Wajah belum cocok. Posisikan wajah tepat di dalam garis fokus dan pastikan pencahayaan cukup.', true);
+                    faceStatus('face-verify-status',
+                        saved.message || 'Wajah belum cocok. Posisikan wajah di dalam garis fokus.', true);
+                    faceAutoCandidateFrames = [];
+                    await new Promise(resolve => setTimeout(resolve, 450));
                 }
             } else {
                 faceUpdateFocusGuide(video, null, 'search');
-                faceAutoCandidateId = ''; faceAutoCandidateFrames = []; faceLivenessChallenge = null; faceLivenessPassed = false;
+                faceAutoCandidateFrames = [];
+                faceAutoWaitForFaceExit = false;
                 faceAutoLastRecordedId = '';
-                faceLastVoiceState = '';
-                faceStatus('face-verify-status', 'Arahkan satu wajah ke dalam garis fokus kamera. Sistem sedang mencari wajah…', false);
+                faceStatus('face-verify-status',
+                    'Arahkan satu wajah ke dalam garis fokus kamera. Sistem sedang mencari wajah…', false);
             }
         } catch (err) {
-            if (faceAutoScanActive) faceStatus('face-verify-status', 'Smart Face pilot: ' + err.message, true);
+            if (faceAutoScanActive) faceStatus('face-verify-status', 'Smart Face: ' + err.message, true);
         } finally {
             faceAutoScanInFlight = false;
-            if (faceAutoScanActive) faceAutoScanTimer = setTimeout(faceAutoScanTick, faceLivenessChallenge ? 450 : 900);
+            if (faceAutoScanActive) faceAutoScanTimer = setTimeout(faceAutoScanTick, 300);
         }
     }
 
